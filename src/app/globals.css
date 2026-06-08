@@ -322,10 +322,17 @@ body {
 
 @keyframes hero-zoom {
   from {
-    transform: scale(1.08);
+    transform: translate3d(0, 0, 0) scale(1.08);
   }
   to {
-    transform: scale(1);
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-\[hero-zoom_20s_ease-out_forwards\] {
+    animation: none !important;
+    transform: none !important;
   }
 }
 

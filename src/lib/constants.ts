@@ -1,7 +1,7 @@
 export const SITE_NAME = "South West London Removals";
 export const SITE_URL = "https://www.swlremovals.co.uk";
 export const SITE_DESCRIPTION =
-  "Premium removals across Wimbledon and South West London. Fixed quotations, insured crews, WhatsApp video surveys for home, office, packing and storage moves across Surrey.";
+  "Premium removals across Wimbledon & South West London with same day instant online quotes, video or in-person surveys available. Fully insured moving, packing and storage services.";
 
 export const PHONE = "020 7946 0958";
 export const PHONE_HREF = "tel:+442079460958";

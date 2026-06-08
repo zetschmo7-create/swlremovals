@@ -13,42 +13,41 @@ import {
 } from "@/lib/constants";
 import { MapPin, MessageCircle, ArrowRight } from "lucide-react";
 import { JsonLd } from "@/components/seo/JsonLd";
-import { SITE_NAME, SITE_URL } from "@/lib/constants";
+import {
+  createBreadcrumbSchema,
+  createFaqSchema,
+  createServiceSchema,
+  organizationReference,
+} from "@/lib/schema";
 
 type Props = {
   area: AreaData;
 };
 
 export function AreaPageTemplate({ area }: Props) {
-  const schema = {
-    "@context": "https://schema.org",
-    "@type": "Service",
-    name: area.title,
-    description: area.description,
-    provider: {
-      "@type": "MovingCompany",
-      name: SITE_NAME,
-      url: SITE_URL,
-    },
-    areaServed: area.name,
+  const areaPath = `/areas/${area.slug}`;
+
+  const serviceSchema = {
+    ...createServiceSchema({
+      name: area.title,
+      description: area.description,
+      path: areaPath,
+      areaServed: area.name,
+    }),
+    provider: organizationReference(),
   };
 
-  const faqSchema = {
-    "@context": "https://schema.org",
-    "@type": "FAQPage",
-    mainEntity: area.faqs.map((faq) => ({
-      "@type": "Question",
-      name: faq.question,
-      acceptedAnswer: {
-        "@type": "Answer",
-        text: faq.answer,
-      },
-    })),
-  };
+  const faqSchema = createFaqSchema(area.faqs);
+
+  const breadcrumbSchema = createBreadcrumbSchema([
+    { name: "Home", path: "/" },
+    { name: "Areas", path: "/areas" },
+    { name: area.title, path: areaPath },
+  ]);
 
   return (
     <>
-      <JsonLd data={[schema, faqSchema]} />
+      <JsonLd data={[serviceSchema, faqSchema, breadcrumbSchema]} />
 
       <section className="relative bg-green-900 pt-32 pb-20 md:pt-40 md:pb-28">
         <div className="absolute inset-0 bg-gradient-to-br from-green-950 to-green-800" />
@@ -167,6 +166,13 @@ export function AreaPageTemplate({ area }: Props) {
                       </Link>
                     ))}
                   </div>
+                  <Link
+                    href="/areas-covered"
+                    className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-green-800 hover:text-green-900"
+                  >
+                    View all 100+ locations
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </Link>
                 </div>
               </Card>
             </FadeIn>

@@ -12,14 +12,7 @@ import { Button } from "@/components/ui/Button";
 import { QuoteButton } from "@/components/quote/QuoteButton";
 import { CTABanner } from "@/components/home/CTABanner";
 import { JsonLd } from "@/components/seo/JsonLd";
-import {
-  SITE_NAME,
-  SITE_URL,
-  SITE_DESCRIPTION,
-  PHONE,
-  EMAIL,
-  TRUST_STATS,
-} from "@/lib/constants";
+import { SITE_NAME, SITE_URL } from "@/lib/constants";
 import { IMAGES } from "@/lib/images";
 import { ChevronRight, ArrowRight } from "lucide-react";
 
@@ -48,26 +41,6 @@ export function LocationsHub() {
     ],
   };
 
-  const localBusinessSchema = {
-    "@context": "https://schema.org",
-    "@type": "MovingCompany",
-    name: SITE_NAME,
-    description: SITE_DESCRIPTION,
-    url: SITE_URL,
-    telephone: PHONE,
-    email: EMAIL,
-    areaServed: allLocations.map((location) => ({
-      "@type": "Place",
-      name: location.locationName,
-      url: `${SITE_URL}${locationPath(location.slug)}`,
-    })),
-    aggregateRating: {
-      "@type": "AggregateRating",
-      ratingValue: TRUST_STATS.googleRating,
-      reviewCount: TRUST_STATS.reviewCount,
-    },
-  };
-
   const collectionSchema = {
     "@context": "https://schema.org",
     "@type": "CollectionPage",
@@ -75,11 +48,8 @@ export function LocationsHub() {
     description:
       "Premium removals locations across South West London, Central London, Surrey and commuter towns.",
     url: pageUrl,
-    isPartOf: {
-      "@type": "WebSite",
-      name: SITE_NAME,
-      url: SITE_URL,
-    },
+    isPartOf: { "@id": `${SITE_URL}/#website` },
+    publisher: { "@id": `${SITE_URL}/#organization` },
     mainEntity: {
       "@type": "ItemList",
       numberOfItems: allLocations.length,
@@ -94,7 +64,7 @@ export function LocationsHub() {
 
   return (
     <>
-      <JsonLd data={[breadcrumbSchema, localBusinessSchema, collectionSchema]} />
+      <JsonLd data={[breadcrumbSchema, collectionSchema]} />
 
       <section className="relative min-h-[52vh] md:min-h-[58vh] flex items-end overflow-hidden">
         <div className="absolute inset-0">

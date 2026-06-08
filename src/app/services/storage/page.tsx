@@ -1,17 +1,20 @@
 import { createMetadata } from "@/lib/seo";
 import { ServicePageTemplate } from "@/components/templates/ServicePageTemplate";
+import { IMAGES } from "@/lib/images";
 
 export const metadata = createMetadata({
   title: "Storage",
   description:
     "Secure storage solutions for South West London removals. Short and long-term storage for chain moves and downsizing.",
   path: "/services/storage",
+  ogImage: IMAGES.storage,
   keywords: ["storage removals", "furniture storage London"],
 });
 
 export default function StoragePage() {
   return (
     <ServicePageTemplate
+      path="/services/storage"
       title="Storage"
       description="Secure short and long-term storage. Ideal for chain moves, renovations, and downsizing."
       intro="Not every move aligns perfectly. Whether you are in a property chain, renovating, or downsizing, our storage service keeps your belongings secure and accessible until you are ready — with the same careful handling standards we apply to every move."

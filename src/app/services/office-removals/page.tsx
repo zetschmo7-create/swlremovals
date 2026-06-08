@@ -1,17 +1,20 @@
 import { createMetadata } from "@/lib/seo";
 import { ServicePageTemplate } from "@/components/templates/ServicePageTemplate";
+import { IMAGES } from "@/lib/images";
 
 export const metadata = createMetadata({
   title: "Office Removals",
   description:
     "Discreet, efficient office removals across South West London. Minimal disruption, professional crews, fixed quotations.",
   path: "/services/office-removals",
+  ogImage: IMAGES.officeMove,
   keywords: ["office removals", "commercial relocation London"],
 });
 
 export default function OfficeRemovalsPage() {
   return (
     <ServicePageTemplate
+      path="/services/office-removals"
       title="Office Removals"
       description="Discreet commercial relocations with minimal business disruption. Planned, efficient, and handled properly."
       intro="Office moves demand precision and discretion. Whether you are relocating a small professional practice or a multi-floor commercial space, we plan every detail — from IT equipment handling to out-of-hours scheduling — so your business experiences minimal downtime."

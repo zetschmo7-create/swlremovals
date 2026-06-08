@@ -7,14 +7,19 @@ import {
   EMAIL,
   TRUST_STATS,
 } from "@/lib/constants";
+import { IMAGES } from "@/lib/images";
+import { ORGANIZATION_ID, WEBSITE_ID } from "@/lib/schema";
 
 export function LocalBusinessSchema() {
-  const schema = {
+  const organizationSchema = {
     "@context": "https://schema.org",
-    "@type": "MovingCompany",
+    "@type": ["MovingCompany", "LocalBusiness"],
+    "@id": ORGANIZATION_ID,
     name: SITE_NAME,
     description: SITE_DESCRIPTION,
     url: SITE_URL,
+    image: `${SITE_URL}${IMAGES.og}`,
+    logo: `${SITE_URL}${IMAGES.logo}`,
     telephone: PHONE,
     email: EMAIL,
     address: {
@@ -55,5 +60,16 @@ export function LocalBusinessSchema() {
     ],
   };
 
-  return <JsonLd data={schema} />;
+  const websiteSchema = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "@id": WEBSITE_ID,
+    name: SITE_NAME,
+    url: SITE_URL,
+    description: SITE_DESCRIPTION,
+    publisher: { "@id": ORGANIZATION_ID },
+    inLanguage: "en-GB",
+  };
+
+  return <JsonLd data={[organizationSchema, websiteSchema]} />;
 }

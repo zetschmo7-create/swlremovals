@@ -53,12 +53,13 @@ export type LocationPageData = {
 };
 
 const DEFAULT_INTERNAL_LINKS: LocationInternalLink[] = [
-  { label: "House removals", href: "/services/house-removals" },
-  { label: "Office removals", href: "/services/office-removals" },
-  { label: "Packing service", href: "/services/packing" },
-  { label: "Storage", href: "/services/storage" },
-  { label: "Get a fixed quote", href: "/quote" },
-  { label: "Contact us", href: "/contact" },
+  { label: "Areas we cover", href: "/areas-covered" },
+  { label: "House removals service", href: "/services/house-removals" },
+  { label: "Office removals service", href: "/services/office-removals" },
+  { label: "Professional packing", href: "/services/packing" },
+  { label: "Secure storage options", href: "/services/storage" },
+  { label: "Request a fixed quote", href: "/quote" },
+  { label: "Speak to our team", href: "/contact" },
 ];
 
 export const LOCATION_PAGES: LocationPageData[] = [

@@ -1,17 +1,20 @@
 import { createMetadata } from "@/lib/seo";
 import { ServicePageTemplate } from "@/components/templates/ServicePageTemplate";
+import { IMAGES } from "@/lib/images";
 
 export const metadata = createMetadata({
   title: "Packing Services",
   description:
     "Professional packing services for South West London moves. Premium materials, careful labelling, full or partial packing.",
   path: "/services/packing",
+  ogImage: IMAGES.packing,
   keywords: ["packing service", "professional packers London"],
 });
 
 export default function PackingPage() {
   return (
     <ServicePageTemplate
+      path="/services/packing"
       title="Packing Services"
       description="Professional packing with premium materials. Full, partial, or fragile-only — handled with care."
       intro="Proper packing is the foundation of a stress-free move. Our packing teams use quality materials, systematic labelling, and the experience to know how valuable and fragile items should be protected — from fine china to artwork and electronics."

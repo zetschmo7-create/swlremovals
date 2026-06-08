@@ -14,14 +14,13 @@ import { FadeIn } from "@/components/ui/FadeIn";
 import { CTABanner } from "@/components/home/CTABanner";
 import { PageHero } from "@/components/templates/PageHero";
 import { JsonLd } from "@/components/seo/JsonLd";
+import { WHATSAPP_SURVEY_HREF } from "@/lib/constants";
 import {
-  SITE_NAME,
-  SITE_URL,
-  PHONE,
-  EMAIL,
-  WHATSAPP_SURVEY_HREF,
-  TRUST_STATS,
-} from "@/lib/constants";
+  createBreadcrumbSchema,
+  createFaqSchema,
+  createServiceSchema,
+  organizationReference,
+} from "@/lib/schema";
 import {
   MapPin,
   MessageCircle,
@@ -39,16 +38,16 @@ type Props = {
 };
 
 export function LocationPageTemplate({ location }: Props) {
-  const pageUrl = `${SITE_URL}${locationPath(location.slug)}`;
+  const pagePath = locationPath(location.slug);
 
-  const localBusinessSchema = {
-    "@context": "https://schema.org",
-    "@type": "MovingCompany",
-    name: SITE_NAME,
-    url: SITE_URL,
-    telephone: PHONE,
-    email: EMAIL,
-    description: location.metaDescription,
+  const serviceSchema = {
+    ...createServiceSchema({
+      name: `${location.locationName} removals`,
+      description: location.metaDescription,
+      path: pagePath,
+      areaServed: location.locationName,
+    }),
+    provider: organizationReference(),
     areaServed: {
       "@type": "Place",
       name: location.locationName,
@@ -62,54 +61,19 @@ export function LocationPageTemplate({ location }: Props) {
         addressCountry: "GB",
       },
     },
-    aggregateRating: {
-      "@type": "AggregateRating",
-      ratingValue: TRUST_STATS.googleRating,
-      reviewCount: TRUST_STATS.reviewCount,
-    },
   };
 
-  const faqSchema = {
-    "@context": "https://schema.org",
-    "@type": "FAQPage",
-    mainEntity: location.faq.map((item) => ({
-      "@type": "Question",
-      name: item.question,
-      acceptedAnswer: {
-        "@type": "Answer",
-        text: item.answer,
-      },
-    })),
-  };
+  const faqSchema = createFaqSchema(location.faq);
 
-  const breadcrumbSchema = {
-    "@context": "https://schema.org",
-    "@type": "BreadcrumbList",
-    itemListElement: [
-      {
-        "@type": "ListItem",
-        position: 1,
-        name: "Home",
-        item: SITE_URL,
-      },
-      {
-        "@type": "ListItem",
-        position: 2,
-        name: "Areas covered",
-        item: `${SITE_URL}${AREAS_COVERED_PATH}`,
-      },
-      {
-        "@type": "ListItem",
-        position: 3,
-        name: `${location.locationName} removals`,
-        item: pageUrl,
-      },
-    ],
-  };
+  const breadcrumbSchema = createBreadcrumbSchema([
+    { name: "Home", path: "/" },
+    { name: "Areas covered", path: AREAS_COVERED_PATH },
+    { name: `${location.locationName} removals`, path: pagePath },
+  ]);
 
   return (
     <>
-      <JsonLd data={[localBusinessSchema, faqSchema, breadcrumbSchema]} />
+      <JsonLd data={[serviceSchema, faqSchema, breadcrumbSchema]} />
 
       <PageHero
         eyebrow={`${location.locationName} · ${location.postcodes.join(", ")}`}

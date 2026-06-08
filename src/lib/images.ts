@@ -1,6 +1,7 @@
 /** Central image registry — paths relative to /public */
 export const IMAGES = {
-  hero: "/images/South West London Removals - Wimbledon House Move Hero.png",
+  hero: "/images/sw-london-removals-hero-home-move-south-west-london.webp",
+  og: "/images/South West London Removals.webp",
   banner: "/images/sw-london-removals-home-banner.webp.webp",
   logo: "/images/sw-london-removals-logo.webp",
   navLogo: "/images/sw-london-removals-logo.webp",

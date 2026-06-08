@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import {
   createContext,
   useCallback,
@@ -7,7 +8,14 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { MoveFlowQuoteModal } from "@/components/quote/MoveFlowQuoteModal";
+
+const MoveFlowQuoteModal = dynamic(
+  () =>
+    import("@/components/quote/MoveFlowQuoteModal").then(
+      (mod) => mod.MoveFlowQuoteModal
+    ),
+  { ssr: false }
+);
 
 type MoveFlowModalContextValue = {
   isOpen: boolean;
@@ -32,7 +40,7 @@ export function MoveFlowModalProvider({ children }: { children: ReactNode }) {
   return (
     <MoveFlowModalContext.Provider value={value}>
       {children}
-      <MoveFlowQuoteModal isOpen={isOpen} onClose={closeQuoteModal} />
+      {isOpen ? <MoveFlowQuoteModal isOpen={isOpen} onClose={closeQuoteModal} /> : null}
     </MoveFlowModalContext.Provider>
   );
 }

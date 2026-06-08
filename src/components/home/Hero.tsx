@@ -18,7 +18,7 @@ export function Hero() {
           fill
           priority
           sizes="100vw"
-          className="object-cover object-[50%_38%] sm:object-[50%_40%] md:object-[center_42%] scale-105 animate-[hero-zoom_20s_ease-out_forwards]"
+          className="object-cover object-[50%_38%] sm:object-[50%_40%] md:object-[center_42%] scale-105 animate-[hero-zoom_20s_ease-out_forwards] will-change-transform transform-gpu"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-green-950/95 via-green-950/60 to-green-900/30" />
         <div className="absolute inset-0 bg-gradient-to-r from-green-950/70 via-transparent to-transparent" />
