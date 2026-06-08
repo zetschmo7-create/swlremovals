@@ -340,21 +340,24 @@ body {
   }
 }
 
-/* MoveFlow badge embed */
-.moveflow-badges-shell {
-  overflow: hidden;
+/* Homepage trust strip — MoveFlow embeds */
+.trust-reviews-widget {
+  overflow: visible;
 }
 
-.moveflow-badges-shell .moveflow-badges {
-  width: 100%;
+.trust-reviews-widget iframe {
+  display: block;
   max-width: 100%;
-  background: transparent;
-  overflow: hidden;
+}
+
+.moveflow-badges-shell {
+  overflow: visible;
 }
 
 .moveflow-badges-shell iframe {
+  display: block;
   max-width: 100%;
-  overflow: hidden;
+  border: 0;
 }
 
 /* Section divider rhythm */

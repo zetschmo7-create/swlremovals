@@ -10,11 +10,11 @@ export function TrustSection() {
     >
       <div className="mx-auto max-w-7xl px-5 sm:px-6 lg:px-8 py-6 md:py-8">
         <FadeIn>
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5 md:gap-8">
-            <div className="w-full lg:w-auto flex justify-center lg:justify-start shrink-0">
+          <div className="flex flex-col lg:flex-row lg:items-center gap-8 lg:gap-12">
+            <div className="w-full lg:w-[38%] flex justify-center lg:justify-start">
               <MoveFlowReviewsBadge />
             </div>
-            <div className="w-full lg:flex-1 lg:max-w-3xl flex justify-center lg:justify-end min-w-0">
+            <div className="w-full lg:w-[62%] flex justify-center lg:justify-end">
               <MoveFlowBadges />
             </div>
           </div>
