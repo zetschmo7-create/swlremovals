@@ -340,13 +340,15 @@ body {
   }
 }
 
-/* Homepage trust strip — MoveFlow embeds */
+/* Homepage MoveFlow embeds */
 .trust-reviews-widget {
+  width: 100%;
   overflow: visible;
 }
 
 .trust-reviews-widget iframe {
   display: block;
+  width: 100%;
   max-width: 100%;
 }
 

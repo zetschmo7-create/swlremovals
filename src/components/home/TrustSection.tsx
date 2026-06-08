@@ -1,22 +1,27 @@
 import { FadeIn } from "@/components/ui/FadeIn";
 import { MoveFlowReviewsBadge } from "@/components/reviews/MoveFlowReviews";
-import { MoveFlowBadges } from "@/components/reviews/MoveFlowBadges";
+import { MOVEFLOW_REVIEWS_URL } from "@/lib/moveflow";
 
 export function TrustSection() {
   return (
     <section
       className="relative z-20 border-b border-border/50 bg-cream"
-      aria-label="Verified reviews and accreditation"
+      aria-label="Verified reviews"
     >
-      <div className="mx-auto max-w-7xl px-5 sm:px-6 lg:px-8 py-6 md:py-8">
+      <div className="mx-auto max-w-7xl px-5 sm:px-6 lg:px-8 py-4 md:py-5">
         <FadeIn>
-          <div className="flex flex-col lg:flex-row lg:items-center gap-8 lg:gap-12">
-            <div className="w-full lg:w-[38%] flex justify-center lg:justify-start">
+          <div className="flex flex-col items-center justify-center gap-3">
+            <div className="w-full max-w-xl mx-auto">
               <MoveFlowReviewsBadge />
             </div>
-            <div className="w-full lg:w-[62%] flex justify-center lg:justify-end">
-              <MoveFlowBadges />
-            </div>
+            <a
+              href={MOVEFLOW_REVIEWS_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm font-medium text-green-800 hover:text-green-900 underline-offset-4 hover:underline transition-colors"
+            >
+              View verified profile
+            </a>
           </div>
         </FadeIn>
       </div>

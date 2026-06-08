@@ -4,6 +4,7 @@ import { BeforeAfter } from "@/components/home/BeforeAfter";
 import { ServicesSection } from "@/components/home/ServicesSection";
 import { OperationalTrust } from "@/components/home/OperationalTrust";
 import { Testimonials } from "@/components/home/Testimonials";
+import { AccreditationSection } from "@/components/home/AccreditationSection";
 import { AreasPreview } from "@/components/home/AreasPreview";
 import { HomeFAQ } from "@/components/home/HomeFAQ";
 import { CTABanner } from "@/components/home/CTABanner";
@@ -17,6 +18,7 @@ export default function HomePage() {
       <ServicesSection />
       <OperationalTrust />
       <Testimonials />
+      <AccreditationSection />
       <AreasPreview />
       <HomeFAQ />
       <CTABanner />

@@ -1,14 +1,55 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  MOVEFLOW_BADGES_IFRAME_HEIGHT,
-  MOVEFLOW_BADGES_IFRAME_SRC,
+  buildMoveFlowBadgesIframeSrc,
+  MOVEFLOW_BADGES_IFRAME_FALLBACK_HEIGHT,
 } from "@/lib/moveflow";
 
-export function MoveFlowBadges() {
+type Props = {
+  badges?: string;
+  layout?: "row" | "grid" | "strip";
+  variant?: string;
+  title?: string;
+  fallbackHeight?: number;
+  className?: string;
+};
+
+export function MoveFlowBadges({
+  badges,
+  layout = "row",
+  variant = "shield-seal",
+  title,
+  fallbackHeight = MOVEFLOW_BADGES_IFRAME_FALLBACK_HEIGHT,
+  className = "",
+}: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
   const [shouldLoad, setShouldLoad] = useState(false);
+  const [height, setHeight] = useState(fallbackHeight);
+
+  const src = useMemo(
+    () => buildMoveFlowBadgesIframeSrc({ badges, layout, variant, title }),
+    [badges, layout, variant, title]
+  );
+
+  useEffect(() => {
+    setHeight(fallbackHeight);
+  }, [fallbackHeight, src]);
+
+  useEffect(() => {
+    const onMessage = (event: MessageEvent) => {
+      if (
+        event.data?.type === "moveflow:badges:size" &&
+        typeof event.data.height === "number" &&
+        event.data.height > 0
+      ) {
+        setHeight(Math.ceil(event.data.height));
+      }
+    };
+
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, []);
 
   useEffect(() => {
     const root = rootRef.current;
@@ -31,14 +72,14 @@ export function MoveFlowBadges() {
   return (
     <div
       ref={rootRef}
-      className="moveflow-badges-shell w-full"
-      style={{ minHeight: MOVEFLOW_BADGES_IFRAME_HEIGHT }}
+      className={`moveflow-badges-shell w-full ${className}`}
+      style={{ minHeight: shouldLoad ? height : fallbackHeight }}
     >
       {shouldLoad && (
         <iframe
-          src={MOVEFLOW_BADGES_IFRAME_SRC}
+          src={src}
           width="100%"
-          height={MOVEFLOW_BADGES_IFRAME_HEIGHT}
+          height={height}
           loading="lazy"
           scrolling="no"
           title="MoveFlow accreditation badges"
