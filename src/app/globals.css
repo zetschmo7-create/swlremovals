@@ -341,14 +341,20 @@ body {
 }
 
 /* MoveFlow badge embed */
+.moveflow-badges-shell {
+  overflow: hidden;
+}
+
 .moveflow-badges-shell .moveflow-badges {
   width: 100%;
   max-width: 100%;
   background: transparent;
+  overflow: hidden;
 }
 
 .moveflow-badges-shell iframe {
   max-width: 100%;
+  overflow: hidden;
 }
 
 /* Section divider rhythm */

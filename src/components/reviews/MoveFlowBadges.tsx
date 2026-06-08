@@ -9,6 +9,8 @@ import {
   MOVEFLOW_SLUG,
 } from "@/lib/moveflow";
 
+const BADGE_IFRAME_HEIGHT = 300;
+
 export function MoveFlowBadges() {
   const rootRef = useRef<HTMLDivElement>(null);
   const badgeRef = useRef<HTMLDivElement>(null);
@@ -49,7 +51,8 @@ export function MoveFlowBadges() {
   return (
     <div
       ref={rootRef}
-      className="moveflow-badges-shell w-full min-h-[220px] md:min-h-[240px] lg:min-h-[260px] flex items-center justify-center"
+      className="moveflow-badges-shell w-full max-w-2xl overflow-hidden flex items-center justify-center"
+      style={{ minHeight: useFallback ? BADGE_IFRAME_HEIGHT : undefined }}
     >
       {shouldLoad && !useFallback && (
         <>
@@ -77,20 +80,22 @@ export function MoveFlowBadges() {
           href={MOVEFLOW_REVIEWS_URL}
           target="_blank"
           rel="noopener noreferrer"
-          className="block w-full max-w-full"
+          className="block w-full overflow-hidden"
           aria-label="View verified reviews and accreditation on MoveFlow"
         >
           <iframe
             src={MOVEFLOW_BADGES_IFRAME_SRC}
             width="100%"
-            height={280}
+            height={BADGE_IFRAME_HEIGHT}
             loading="lazy"
+            scrolling="no"
             title="MoveFlow accreditation badges"
-            className="block w-full border-0 bg-transparent"
+            className="block w-full border-0 bg-transparent overflow-hidden pointer-events-auto"
             style={{
               border: 0,
               background: "transparent",
               display: "block",
+              overflow: "hidden",
             }}
           />
         </a>
