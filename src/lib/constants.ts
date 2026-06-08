@@ -1,5 +1,5 @@
 export const SITE_NAME = "South West London Removals";
-export const SITE_URL = "https://www.southwestlondonremovals.co.uk";
+export const SITE_URL = "https://www.swlremovals.co.uk";
 export const SITE_DESCRIPTION =
   "Premium removals across Wimbledon and South West London. Fixed quotations, insured crews, WhatsApp video surveys for home, office, packing and storage moves across Surrey.";
 
