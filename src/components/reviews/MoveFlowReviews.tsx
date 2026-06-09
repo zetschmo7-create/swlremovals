@@ -17,6 +17,7 @@ export function MoveFlowReviewsBadge() {
       {/* Mobile & tablet — review-card layout with profile CTA inside widget */}
       {/* MoveFlow widget requires auto-height/postMessage support from the widget provider. */}
       <div className="trust-reviews-widget--mobile lg:hidden w-full">
+        <div className="trust-reviews-widget__ambient" aria-hidden="true" />
         <iframe
           src={MOVEFLOW_REVIEWS_IFRAME_SRC_MOBILE}
           style={{
