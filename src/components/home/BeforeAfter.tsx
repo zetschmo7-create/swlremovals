@@ -4,7 +4,7 @@ import { FadeIn } from "@/components/ui/FadeIn";
 
 export function BeforeAfter() {
   return (
-    <Section className="!py-16 md:!py-24">
+    <Section className="!py-16 md:!py-24 max-lg:!pt-8 max-lg:scroll-mt-1">
       <SectionHeader
         eyebrow="How we work"
         title="Every detail handled before the first item leaves the room."

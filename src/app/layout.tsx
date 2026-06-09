@@ -46,7 +46,7 @@ export default function RootLayout({
       className={`${dmSans.variable} ${sora.variable} h-full antialiased`}
     >
       <body
-        className="min-h-full flex flex-col font-sans pb-16 lg:pb-0"
+        className="min-h-full flex flex-col font-sans max-lg:pb-[var(--mobile-cta-inset)] lg:pb-0"
         data-analytics-ready="true"
       >
         <LocalBusinessSchema />

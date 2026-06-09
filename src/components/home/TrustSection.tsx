@@ -8,9 +8,9 @@ export function TrustSection() {
       className="relative z-20 border-b border-border/50 bg-cream"
       aria-label="Verified reviews"
     >
-      <div className="mx-auto max-w-7xl px-5 sm:px-6 lg:px-8 py-3 max-lg:pb-5 lg:py-5">
+      <div className="mx-auto max-w-7xl px-5 sm:px-6 lg:px-8 max-lg:py-2 max-lg:pt-3 lg:py-5">
         <FadeIn>
-          <div className="flex flex-col items-center justify-center gap-3 lg:gap-3.5">
+          <div className="flex flex-col items-center justify-center max-lg:gap-0 lg:gap-3.5">
             <div className="w-full max-w-xl mx-auto max-lg:max-w-full max-lg:overflow-x-clip">
               <MoveFlowReviewsBadge />
             </div>
