@@ -10,6 +10,13 @@ export const MOVEFLOW_REVIEWS_URL =
 export const MOVEFLOW_REVIEWS_IFRAME_SRC =
   "https://moveflow.cloud/widgets/reviews/sw-london-removals?type=badge&theme=light&accent=%230F3D2E&limit=6&source=all&showSources=true&showVerified=true&minRating=0&radius=16";
 
+/** Compact badge embed for mobile/tablet — hides source icons to prevent overlap */
+export const MOVEFLOW_REVIEWS_IFRAME_SRC_MOBILE =
+  "https://moveflow.cloud/widgets/reviews/sw-london-removals?type=badge&theme=light&accent=%230F3D2E&limit=6&source=all&showSources=false&showVerified=true&minRating=0&radius=12";
+
+export const MOVEFLOW_REVIEWS_IFRAME_HEIGHT_DESKTOP = 150;
+export const MOVEFLOW_REVIEWS_IFRAME_HEIGHT_MOBILE = 212;
+
 export const MOVEFLOW_SLUG = "sw-london-removals";
 
 /** Selected accreditation badges for the homepage section */

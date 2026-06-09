@@ -46,8 +46,11 @@ export function Hero() {
         </FadeIn>
 
         <FadeIn delay={0.35}>
-          <div className="mt-10 flex flex-col sm:flex-row flex-wrap gap-3">
-            <QuoteButton size="lg" className="shadow-[var(--shadow-elevated)]">
+          <div className="mt-10 flex flex-col max-lg:gap-3.5 lg:flex-row lg:flex-wrap lg:gap-3">
+            <QuoteButton
+              size="lg"
+              className="shadow-[var(--shadow-elevated)] max-lg:w-full max-lg:justify-center"
+            >
               Get My Quote
             </QuoteButton>
             <Button
@@ -55,11 +58,18 @@ export function Hero() {
               variant="whatsapp"
               size="lg"
               external
+              className="max-lg:w-full max-lg:justify-center"
             >
               <MessageCircle className="w-5 h-5" />
               Send WhatsApp Video
             </Button>
-            <Button href={PHONE_HREF} variant="outline" size="lg" external>
+            <Button
+              href={PHONE_HREF}
+              variant="outline"
+              size="lg"
+              external
+              className="hidden lg:inline-flex"
+            >
               <Phone className="w-5 h-5" />
               Call Now
             </Button>

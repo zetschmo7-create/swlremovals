@@ -350,13 +350,32 @@ body {
 /* Homepage MoveFlow embeds */
 .trust-reviews-widget {
   width: 100%;
+}
+
+.trust-reviews-widget--desktop {
   overflow: visible;
 }
 
-.trust-reviews-widget iframe {
+.trust-reviews-widget--desktop iframe {
   display: block;
   width: 100%;
   max-width: 100%;
+}
+
+@media (max-width: 1023px) {
+  .trust-reviews-widget--mobile {
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
+    margin-inline: auto;
+  }
+
+  .trust-reviews-widget--mobile iframe {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
+  }
 }
 
 .moveflow-badges-shell {
