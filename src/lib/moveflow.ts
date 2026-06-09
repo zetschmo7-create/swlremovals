@@ -10,12 +10,12 @@ export const MOVEFLOW_REVIEWS_URL =
 export const MOVEFLOW_REVIEWS_IFRAME_SRC =
   "https://moveflow.cloud/widgets/reviews/sw-london-removals?type=badge&theme=light&accent=%230F3D2E&limit=6&source=all&showSources=true&showVerified=true&minRating=0&radius=16";
 
-/** Stacked review-card embed for mobile/tablet — no cramped badge row */
+/** Mobile-compact reviews embed for mobile/tablet */
 export const MOVEFLOW_REVIEWS_IFRAME_SRC_MOBILE =
-  "https://moveflow.cloud/widgets/reviews/sw-london-removals?type=review-card&theme=light&accent=%230F3D2E&limit=3&source=all&showSources=false&showVerified=true&minRating=0&radius=12";
+  "https://moveflow.cloud/widgets/reviews/sw-london-removals?type=mobile-compact&theme=light&accent=%230F3D2E&limit=2&bg=transparent&showSources=false&showVerified=true&radius=16";
 
 export const MOVEFLOW_REVIEWS_IFRAME_HEIGHT_DESKTOP = 150;
-export const MOVEFLOW_REVIEWS_IFRAME_HEIGHT_MOBILE = 620;
+export const MOVEFLOW_REVIEWS_IFRAME_HEIGHT_MOBILE = 360;
 
 export const MOVEFLOW_SLUG = "sw-london-removals";
 

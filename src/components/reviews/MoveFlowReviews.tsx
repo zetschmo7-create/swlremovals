@@ -14,20 +14,23 @@ const iframeStyle = {
 export function MoveFlowReviewsBadge() {
   return (
     <div className="trust-reviews-widget w-full">
-      {/* Mobile & tablet — review-card layout with profile CTA inside widget */}
-      {/* MoveFlow widget requires auto-height/postMessage support from the widget provider. */}
+      {/* Mobile & tablet — MoveFlow mobile-compact embed */}
       <div className="trust-reviews-widget--mobile lg:hidden w-full">
         <div className="trust-reviews-widget__ambient" aria-hidden="true" />
         <iframe
           src={MOVEFLOW_REVIEWS_IFRAME_SRC_MOBILE}
+          width="100%"
+          height={MOVEFLOW_REVIEWS_IFRAME_HEIGHT_MOBILE}
           style={{
             ...iframeStyle,
             height: MOVEFLOW_REVIEWS_IFRAME_HEIGHT_MOBILE,
             minHeight: MOVEFLOW_REVIEWS_IFRAME_HEIGHT_MOBILE,
+            display: "block",
+            overflow: "hidden",
           }}
           loading="lazy"
           scrolling="no"
-          title="MoveFlow Reviews"
+          title="MoveFlow verified reviews"
           className="block w-full max-w-full bg-transparent"
         />
       </div>
