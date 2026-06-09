@@ -25,6 +25,7 @@ type SectionHeaderProps = {
   light?: boolean;
   align?: "left" | "center";
   className?: string;
+  titleClassName?: string;
 };
 
 export function SectionHeader({
@@ -34,6 +35,7 @@ export function SectionHeader({
   light,
   align = "left",
   className = "",
+  titleClassName = "",
 }: SectionHeaderProps) {
   const alignClass = align === "center" ? "text-center mx-auto" : "";
 
@@ -47,7 +49,7 @@ export function SectionHeader({
         </p>
       )}
       <h2
-        className={`font-display text-3xl md:text-4xl lg:text-5xl font-semibold tracking-tight leading-tight ${light ? "text-white" : "text-charcoal"}`}
+        className={`font-display text-3xl md:text-4xl lg:text-5xl font-semibold tracking-tight leading-tight ${light ? "text-white" : "text-charcoal"} ${titleClassName}`}
       >
         {title}
       </h2>

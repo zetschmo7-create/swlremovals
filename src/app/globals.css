@@ -368,6 +368,10 @@ body {
     max-width: 100%;
     overflow: hidden;
     margin-inline: auto;
+    padding: 0.25rem 0.5rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
   }
 
   .trust-reviews-widget--mobile iframe {
@@ -375,6 +379,7 @@ body {
     width: 100%;
     max-width: 100%;
     overflow: hidden;
+    margin-inline: auto;
   }
 }
 

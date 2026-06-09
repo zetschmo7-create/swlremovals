@@ -14,8 +14,8 @@ const iframeStyle = {
 export function MoveFlowReviewsBadge() {
   return (
     <div className="trust-reviews-widget w-full">
-      {/* Mobile & tablet — compact embed, taller iframe, no source icons */}
-      <div className="trust-reviews-widget--mobile lg:hidden w-full max-w-full overflow-hidden">
+      {/* Mobile & tablet — review-card layout with profile CTA inside widget */}
+      <div className="trust-reviews-widget--mobile lg:hidden w-full">
         <iframe
           src={MOVEFLOW_REVIEWS_IFRAME_SRC_MOBILE}
           style={{
@@ -26,11 +26,11 @@ export function MoveFlowReviewsBadge() {
           loading="lazy"
           scrolling="no"
           title="MoveFlow Reviews"
-          className="block w-full max-w-full bg-transparent mx-auto"
+          className="block w-full bg-transparent"
         />
       </div>
 
-      {/* Desktop — unchanged embed */}
+      {/* Desktop — unchanged badge embed */}
       <div className="trust-reviews-widget--desktop hidden lg:block w-full">
         <iframe
           src={MOVEFLOW_REVIEWS_IFRAME_SRC}

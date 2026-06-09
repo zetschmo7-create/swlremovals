@@ -10,6 +10,7 @@ export function BeforeAfter() {
         title="Every detail handled before the first item leaves the room."
         description="Protection down, furniture wrapped, loading planned."
         className="!mb-10 md:!mb-14 max-w-3xl"
+        titleClassName="max-lg:text-[1.65rem] max-lg:leading-snug"
       />
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-10">

@@ -68,7 +68,7 @@ export function Hero() {
               variant="outline"
               size="lg"
               external
-              className="hidden lg:inline-flex"
+              className="!hidden lg:!inline-flex"
             >
               <Phone className="w-5 h-5" />
               Call Now
