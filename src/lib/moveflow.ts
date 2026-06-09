@@ -15,7 +15,7 @@ export const MOVEFLOW_REVIEWS_IFRAME_SRC_MOBILE =
   "https://moveflow.cloud/widgets/reviews/sw-london-removals?type=review-card&theme=light&accent=%230F3D2E&limit=3&source=all&showSources=false&showVerified=true&minRating=0&radius=12";
 
 export const MOVEFLOW_REVIEWS_IFRAME_HEIGHT_DESKTOP = 150;
-export const MOVEFLOW_REVIEWS_IFRAME_HEIGHT_MOBILE = 270;
+export const MOVEFLOW_REVIEWS_IFRAME_HEIGHT_MOBILE = 420;
 
 export const MOVEFLOW_SLUG = "sw-london-removals";
 
