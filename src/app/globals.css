@@ -366,19 +366,19 @@ body {
   .trust-reviews-widget--mobile {
     width: 100%;
     max-width: 100%;
-    overflow: hidden;
+    overflow: visible;
+    overflow-x: clip;
     margin-inline: auto;
-    padding: 0.25rem 0.5rem;
+    padding: 0.25rem 0.5rem 1.25rem;
     display: flex;
     justify-content: center;
-    align-items: center;
+    align-items: flex-start;
   }
 
   .trust-reviews-widget--mobile iframe {
     display: block;
     width: 100%;
     max-width: 100%;
-    overflow: hidden;
     margin-inline: auto;
   }
 }
