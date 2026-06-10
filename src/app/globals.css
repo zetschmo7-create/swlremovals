@@ -87,7 +87,6 @@ body {
 
 /* Logo link — no boxes, outlines, or backgrounds */
 .nav-logo-link {
-  display: inline-flex;
   align-items: center;
   background: transparent;
   border: 0;

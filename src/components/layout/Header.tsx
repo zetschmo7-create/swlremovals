@@ -42,20 +42,11 @@ export function Header() {
       >
         <div className="mx-auto max-w-7xl px-5 sm:px-6 lg:px-8">
           <div className="flex h-14 md:h-16 items-center justify-between gap-4 lg:gap-6">
-            {/* Desktop logo — always visible from lg */}
-            <Link
-              href="/"
-              className="nav-logo-link hidden lg:inline-flex shrink-0 -my-10"
-              aria-label={`${SITE_NAME} — home`}
-            >
-              <NavLogo scrolled={scrolled} />
-            </Link>
-
-            {/* Mobile logo — only when drawer is closed (drawer has its own logo when open) */}
+            {/* Single header logo — hidden while mobile drawer is open (drawer has its own) */}
             {!open && (
               <Link
                 href="/"
-                className="nav-logo-link inline-flex lg:hidden shrink-0 -my-6 sm:-my-8"
+                className="nav-logo-link inline-flex shrink-0 -my-6 sm:-my-8 lg:-my-10"
                 aria-label={`${SITE_NAME} — home`}
               >
                 <NavLogo scrolled={scrolled} />
@@ -137,7 +128,7 @@ export function Header() {
           <div className="flex shrink-0 items-center justify-between px-5 pt-5 pb-3">
             <Link
               href="/"
-              className="nav-logo-link"
+              className="nav-logo-link inline-flex"
               onClick={closeMenu}
               aria-label={`${SITE_NAME} — home`}
             >
