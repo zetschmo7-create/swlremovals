@@ -3,12 +3,17 @@ import {
   SITE_NAME,
   SITE_URL,
   SITE_DESCRIPTION,
-  PHONE,
+  PHONE_INTERNATIONAL,
   EMAIL,
   TRUST_STATS,
+  AREA_SERVED,
 } from "@/lib/constants";
 import { IMAGES } from "@/lib/images";
-import { ORGANIZATION_ID, WEBSITE_ID } from "@/lib/schema";
+import {
+  ORGANIZATION_ID,
+  WEBSITE_ID,
+  businessPostalAddressSchema,
+} from "@/lib/schema";
 
 export function LocalBusinessSchema() {
   const organizationSchema = {
@@ -20,24 +25,10 @@ export function LocalBusinessSchema() {
     url: SITE_URL,
     image: `${SITE_URL}${IMAGES.og}`,
     logo: `${SITE_URL}${IMAGES.logo}`,
-    telephone: PHONE,
+    telephone: PHONE_INTERNATIONAL,
     email: EMAIL,
-    address: {
-      "@type": "PostalAddress",
-      addressLocality: "Wimbledon",
-      addressRegion: "London",
-      addressCountry: "GB",
-    },
-    areaServed: [
-      "Wimbledon",
-      "Richmond",
-      "Kingston upon Thames",
-      "Clapham",
-      "Fulham",
-      "Wandsworth",
-      "Epsom",
-      "Surrey",
-    ],
+    address: businessPostalAddressSchema(),
+    areaServed: [...AREA_SERVED],
     aggregateRating: {
       "@type": "AggregateRating",
       ratingValue: TRUST_STATS.googleRating,

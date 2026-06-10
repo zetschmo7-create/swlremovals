@@ -1,4 +1,19 @@
-import { SITE_NAME, SITE_URL } from "./constants";
+import {
+  BUSINESS_ADDRESS,
+  SITE_NAME,
+  SITE_URL,
+} from "./constants";
+
+export function businessPostalAddressSchema() {
+  return {
+    "@type": "PostalAddress",
+    streetAddress: BUSINESS_ADDRESS.streetAddress,
+    addressLocality: BUSINESS_ADDRESS.addressLocality,
+    addressRegion: BUSINESS_ADDRESS.addressRegion,
+    postalCode: BUSINESS_ADDRESS.postalCode,
+    addressCountry: BUSINESS_ADDRESS.addressCountry,
+  };
+}
 
 export const ORGANIZATION_ID = `${SITE_URL}/#organization`;
 export const WEBSITE_ID = `${SITE_URL}/#website`;

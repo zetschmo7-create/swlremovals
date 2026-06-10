@@ -7,6 +7,7 @@ import { MobileCTABar } from "@/components/layout/MobileCTABar";
 import { WhatsAppFloat } from "@/components/layout/WhatsAppFloat";
 import { StickyQuoteCTA } from "@/components/layout/StickyQuoteCTA";
 import { GoogleAnalytics } from "@/components/analytics/GoogleAnalytics";
+import { SeoFlowTracking } from "@/components/analytics/SeoFlowTracking";
 import { LocalBusinessSchema } from "@/components/seo/LocalBusinessSchema";
 import { MoveFlowModalProvider } from "@/context/MoveFlowModalContext";
 import { defaultMetadata } from "@/lib/seo";
@@ -48,6 +49,7 @@ export default function RootLayout({
     >
       <head>
         <GoogleAnalytics />
+        <SeoFlowTracking />
       </head>
       <body
         className="min-h-full flex flex-col font-sans max-lg:pb-[var(--mobile-cta-inset)] lg:pb-0"

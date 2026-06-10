@@ -5,6 +5,8 @@ import {
   PHONE,
   PHONE_HREF,
   EMAIL,
+  EMAIL_HREF,
+  BUSINESS_ADDRESS_LINE,
   WHATSAPP_HREF,
   WHATSAPP_SURVEY_HREF,
 } from "@/lib/constants";
@@ -12,7 +14,7 @@ import { IMAGES, LOGO_DISPLAY } from "@/lib/images";
 import { Button } from "@/components/ui/Button";
 import { QuoteButton } from "@/components/quote/QuoteButton";
 import { QuoteAwareLink } from "@/components/quote/QuoteAwareLink";
-import { Mail, MessageCircle, Phone } from "lucide-react";
+import { MessageCircle } from "lucide-react";
 
 const SERVICE_FOOTER = [
   { label: "House Removals", href: "/services/house-removals" },
@@ -86,17 +88,28 @@ function FooterLinkList({
   );
 }
 
+function FooterNapBlock() {
+  return (
+    <address className="mt-6 not-italic space-y-1.5 text-sm text-white/70">
+      <p className="font-medium text-white/90">{SITE_NAME}</p>
+      <p>{BUSINESS_ADDRESS_LINE}</p>
+      <p>
+        <a href={PHONE_HREF} className="hover:text-white transition-colors">
+          {PHONE}
+        </a>
+      </p>
+      <p>
+        <a href={EMAIL_HREF} className="hover:text-white transition-colors">
+          {EMAIL}
+        </a>
+      </p>
+    </address>
+  );
+}
+
 function FooterContactRow() {
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-8 sm:gap-y-3 lg:flex-nowrap lg:justify-between lg:gap-6">
-      <a href={PHONE_HREF} className={contactLinkClass}>
-        <Phone className="w-4 h-4 shrink-0" aria-hidden />
-        <span>{PHONE}</span>
-      </a>
-      <a href={`mailto:${EMAIL}`} className={contactLinkClass}>
-        <Mail className="w-4 h-4 shrink-0" aria-hidden />
-        <span className="truncate">{EMAIL}</span>
-      </a>
+    <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-8 sm:gap-y-3">
       <a
         href={WHATSAPP_HREF}
         target="_blank"
@@ -160,6 +173,7 @@ export function Footer() {
                 className="nav-logo--hero block w-[170px] sm:w-[200px] h-auto object-contain object-left"
               />
             </Link>
+            <FooterNapBlock />
           </div>
 
           <FooterLinkList

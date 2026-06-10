@@ -3,14 +3,45 @@ export const SITE_URL = "https://www.swlremovals.co.uk";
 export const SITE_DESCRIPTION =
   "Premium removals across Wimbledon & South West London with same day instant online quotes, video or in-person surveys available. Fully insured moving, packing and storage services.";
 
-export const PHONE = "020 7946 0958";
-export const PHONE_HREF = "tel:+442079460958";
+export const PHONE = "020 3026 7324";
+export const PHONE_INTERNATIONAL = "+442030267324";
+export const PHONE_HREF = "tel:+442030267324";
 export const WHATSAPP = "+44 7700 900458";
 export const WHATSAPP_HREF =
   "https://wa.me/447700900458?text=Hello%2C%20I%27d%20like%20to%20discuss%20a%20removal.";
 export const WHATSAPP_SURVEY_HREF =
   "https://wa.me/447700900458?text=Hello%2C%20I%27d%20like%20to%20send%20a%20walkthrough%20video%20for%20a%20quotation.";
-export const EMAIL = "enquiries@southwestlondonremovals.co.uk";
+export const EMAIL = "info@swlremovals.co.uk";
+export const EMAIL_HREF = "mailto:info@swlremovals.co.uk";
+
+export const BUSINESS_ADDRESS = {
+  streetAddress: "30 Durham Rd",
+  addressLocality: "Raynes Park",
+  addressRegion: "London",
+  postalCode: "SW20 0TW",
+  addressCountry: "GB",
+} as const;
+
+export const BUSINESS_ADDRESS_LINE =
+  "30 Durham Rd, Raynes Park, London SW20 0TW";
+
+export const BUSINESS_ADDRESS_MAPS_HREF =
+  "https://www.google.com/maps/search/?api=1&query=30+Durham+Rd%2C+Raynes+Park%2C+London+SW20+0TW%2C+United+Kingdom";
+
+export const AREA_SERVED = [
+  "South West London",
+  "Surrey",
+  "Wimbledon",
+  "Raynes Park",
+  "Putney",
+  "Richmond",
+  "Kingston",
+  "Fulham",
+  "Chelsea",
+  "Kensington",
+  "Guildford",
+  "Woking",
+] as const;
 
 export const TRUST_STATS = {
   googleRating: 4.9,

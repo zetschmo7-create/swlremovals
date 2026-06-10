@@ -9,6 +9,9 @@ import {
   PHONE,
   PHONE_HREF,
   EMAIL,
+  EMAIL_HREF,
+  BUSINESS_ADDRESS_LINE,
+  BUSINESS_ADDRESS_MAPS_HREF,
   WHATSAPP_HREF,
   WHATSAPP_SURVEY_HREF,
 } from "@/lib/constants";
@@ -51,15 +54,15 @@ export default function ContactPage() {
               icon: Mail,
               title: "Email",
               detail: EMAIL,
-              href: `mailto:${EMAIL}`,
+              href: EMAIL_HREF,
               cta: "Send email",
             },
             {
               icon: MapPin,
-              title: "Coverage",
-              detail: "South West London & Surrey",
-              href: "/areas",
-              cta: "View areas",
+              title: "Address",
+              detail: BUSINESS_ADDRESS_LINE,
+              href: BUSINESS_ADDRESS_MAPS_HREF,
+              cta: "Get directions",
             },
           ].map((item, i) => (
             <FadeIn key={item.title} delay={i * 0.08}>
