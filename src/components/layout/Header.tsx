@@ -17,6 +17,8 @@ export function Header() {
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
+  const closeMenu = () => setOpen(false);
+
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 48);
     onScroll();
@@ -34,21 +36,31 @@ export function Header() {
   return (
     <>
       <header
-        className={`fixed top-0 left-0 right-0 z-50 overflow-visible transition-[background,backdrop-filter,box-shadow,border-color] duration-700 ease-out ${
-          scrolled
-            ? "nav-glass"
-            : "nav-hero-float"
-        }`}
+        className={`fixed top-0 left-0 right-0 overflow-visible transition-[background,backdrop-filter,box-shadow,border-color,z-index] duration-700 ease-out ${
+          open ? "z-40 max-lg:pointer-events-none" : "z-50"
+        } ${scrolled ? "nav-glass" : "nav-hero-float"}`}
       >
         <div className="mx-auto max-w-7xl px-5 sm:px-6 lg:px-8">
           <div className="flex h-14 md:h-16 items-center justify-between gap-4 lg:gap-6">
+            {/* Desktop logo — always visible from lg */}
             <Link
               href="/"
-              className="nav-logo-link shrink-0 -my-6 sm:-my-8 lg:-my-10"
+              className="nav-logo-link hidden lg:inline-flex shrink-0 -my-10"
               aria-label={`${SITE_NAME} — home`}
             >
               <NavLogo scrolled={scrolled} />
             </Link>
+
+            {/* Mobile logo — only when drawer is closed (drawer has its own logo when open) */}
+            {!open && (
+              <Link
+                href="/"
+                className="nav-logo-link inline-flex lg:hidden shrink-0 -my-6 sm:-my-8"
+                aria-label={`${SITE_NAME} — home`}
+              >
+                <NavLogo scrolled={scrolled} />
+              </Link>
+            )}
 
             <nav
               className="hidden lg:flex items-center gap-8 xl:gap-11"
@@ -80,87 +92,100 @@ export function Header() {
               </QuoteTrigger>
             </div>
 
-            <button
-              type="button"
-              className={`lg:hidden relative z-10 p-2 -mr-1 rounded-full transition-colors duration-300 ${
-                open
-                  ? "text-charcoal"
-                  : scrolled
+            {/* Mobile menu toggle — only when drawer is closed */}
+            {!open && (
+              <button
+                type="button"
+                className={`lg:hidden relative z-10 p-2 -mr-1 rounded-full transition-colors duration-300 ${
+                  scrolled
                     ? "text-charcoal hover:bg-green-900/5"
                     : "text-cream/90 hover:bg-white/8"
-              }`}
-              onClick={() => setOpen(!open)}
-              aria-label={open ? "Close menu" : "Open menu"}
-              aria-expanded={open}
-            >
-              {open ? <X className="w-6 h-6" strokeWidth={1.5} /> : <Menu className="w-6 h-6" strokeWidth={1.5} />}
-            </button>
+                }`}
+                onClick={() => setOpen(true)}
+                aria-label="Open menu"
+                aria-expanded={false}
+              >
+                <Menu className="w-6 h-6" strokeWidth={1.5} />
+              </button>
+            )}
           </div>
         </div>
       </header>
 
+      {/* Mobile drawer — single logo + single close control */}
       <div
-        className={`lg:hidden fixed inset-0 z-40 transition-all duration-500 ease-out ${
+        className={`lg:hidden fixed inset-0 z-50 transition-all duration-500 ease-out ${
           open ? "visible" : "invisible pointer-events-none"
         }`}
         aria-hidden={!open}
       >
         <div
-          className={`absolute inset-0 bg-green-950/45 backdrop-blur-sm transition-opacity duration-500 ${
+          className={`absolute inset-0 bg-green-950/50 backdrop-blur-[2px] transition-opacity duration-500 ${
             open ? "opacity-100" : "opacity-0"
           }`}
-          onClick={() => setOpen(false)}
+          onClick={closeMenu}
           aria-hidden
         />
         <div
-          className={`absolute inset-y-0 right-0 w-full max-w-sm bg-cream/98 backdrop-blur-xl shadow-[-12px_0_48px_rgba(15,46,31,0.1)] transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] flex flex-col ${
+          role="dialog"
+          aria-modal="true"
+          aria-label="Mobile navigation"
+          className={`absolute inset-y-0 right-0 flex h-dvh w-full max-w-sm flex-col bg-cream shadow-[-16px_0_48px_rgba(15,46,31,0.12)] transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
             open ? "translate-x-0" : "translate-x-full"
           }`}
         >
-          <div className="flex items-center justify-between px-6 pt-7 pb-5">
+          <div className="flex shrink-0 items-center justify-between px-5 pt-5 pb-3">
             <Link
               href="/"
               className="nav-logo-link"
-              onClick={() => setOpen(false)}
+              onClick={closeMenu}
               aria-label={`${SITE_NAME} — home`}
             >
-              <NavLogo scrolled={true} variant="drawer" />
+              <NavLogo scrolled variant="drawer" />
             </Link>
             <button
               type="button"
-              onClick={() => setOpen(false)}
-              className="p-2 rounded-full text-charcoal/70 hover:text-charcoal hover:bg-cream-dark transition-colors"
+              onClick={closeMenu}
+              className="rounded-full p-2 text-charcoal/70 transition-colors hover:bg-cream-dark hover:text-charcoal active:bg-cream-dark/80"
               aria-label="Close menu"
             >
-              <X className="w-5 h-5" strokeWidth={1.5} />
+              <X className="h-5 w-5" strokeWidth={1.5} />
             </button>
           </div>
 
-          <nav className="flex-1 overflow-y-auto px-6 py-4" aria-label="Mobile navigation">
-            <ul className="space-y-0.5">
+          <div className="mx-5 shrink-0 border-b border-border/60" />
+
+          <nav
+            className="flex-1 overflow-y-auto px-5 pt-3 pb-4"
+            aria-label="Mobile navigation"
+          >
+            <ul className="space-y-0">
               {NAV_LINKS.map((link, i) => (
                 <li
                   key={link.href}
-                  style={{ animationDelay: open ? `${i * 45}ms` : "0ms" }}
+                  style={{ animationDelay: open ? `${i * 40}ms` : "0ms" }}
                   className={open ? "animate-[fade-in_0.35s_ease-out_both]" : ""}
                 >
                   <Link
                     href={link.href}
-                    className="group flex items-center justify-between py-4 border-b border-border/50 font-display text-[1.35rem] font-medium tracking-tight text-charcoal hover:text-green-800 transition-colors duration-300"
-                    onClick={() => setOpen(false)}
+                    className="group flex items-center justify-between border-b border-border/40 py-3.5 font-display text-xl font-medium tracking-tight text-charcoal transition-colors duration-200 active:bg-cream-dark/50 hover:text-green-800"
+                    onClick={closeMenu}
                   >
                     {link.label}
-                    <ArrowRight className="w-4 h-4 text-charcoal-muted/0 group-hover:text-green-700 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300" strokeWidth={1.5} />
+                    <ArrowRight
+                      className="h-4 w-4 -translate-x-1 text-green-700 opacity-0 transition-all duration-300 group-hover:translate-x-0 group-hover:opacity-100"
+                      strokeWidth={1.5}
+                    />
                   </Link>
                 </li>
               ))}
             </ul>
           </nav>
 
-          <div className="px-6 py-8 space-y-3.5">
+          <div className="shrink-0 space-y-3 border-t border-border/50 px-5 py-5 pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))]">
             <QuoteTrigger
-              className="nav-cta nav-cta--scrolled w-full"
-              onClick={() => setOpen(false)}
+              className="nav-cta nav-cta--scrolled w-full uppercase tracking-widest"
+              onClick={closeMenu}
             >
               Get My Quote
             </QuoteTrigger>
@@ -168,15 +193,17 @@ export function Header() {
               href={WHATSAPP_SURVEY_HREF}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 w-full py-3.5 text-xs font-semibold uppercase tracking-widest text-green-800/90 hover:text-green-900 transition-colors"
+              onClick={closeMenu}
+              className="flex w-full items-center justify-center gap-2 rounded-full border border-green-800/20 bg-white py-3.5 text-xs font-semibold uppercase tracking-widest text-green-800 transition-colors hover:border-green-800/35 hover:bg-green-800/[0.03] active:bg-green-800/[0.06]"
             >
               Send WhatsApp Video
             </a>
             <a
               href={PHONE_HREF}
-              className="flex items-center justify-center gap-2 py-2 text-sm text-charcoal-muted hover:text-green-800 transition-colors"
+              onClick={closeMenu}
+              className="flex items-center justify-center gap-2 py-2 text-sm text-charcoal-muted transition-colors hover:text-green-800 active:text-green-900"
             >
-              <Phone className="w-4 h-4" strokeWidth={1.75} />
+              <Phone className="h-4 w-4" strokeWidth={1.75} />
               {PHONE}
             </a>
           </div>

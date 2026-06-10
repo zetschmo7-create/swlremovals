@@ -6,6 +6,7 @@ import { Footer } from "@/components/layout/Footer";
 import { MobileCTABar } from "@/components/layout/MobileCTABar";
 import { WhatsAppFloat } from "@/components/layout/WhatsAppFloat";
 import { StickyQuoteCTA } from "@/components/layout/StickyQuoteCTA";
+import { GoogleAnalytics } from "@/components/analytics/GoogleAnalytics";
 import { LocalBusinessSchema } from "@/components/seo/LocalBusinessSchema";
 import { MoveFlowModalProvider } from "@/context/MoveFlowModalContext";
 import { defaultMetadata } from "@/lib/seo";
@@ -45,6 +46,9 @@ export default function RootLayout({
       lang="en-GB"
       className={`${dmSans.variable} ${sora.variable} h-full antialiased`}
     >
+      <head>
+        <GoogleAnalytics />
+      </head>
       <body
         className="min-h-full flex flex-col font-sans max-lg:pb-[var(--mobile-cta-inset)] lg:pb-0"
         data-analytics-ready="true"

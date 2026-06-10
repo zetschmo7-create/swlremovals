@@ -379,62 +379,32 @@ body {
 }
 
 @media (max-width: 1023px) {
-  .trust-reviews-widget--mobile {
-    position: relative;
+  .reviews-mobile-wrap {
+    background: transparent !important;
+    overflow: hidden;
+    margin: 0;
+    padding: 0;
     width: 100%;
     max-width: 100%;
-    overflow: visible;
-    overflow-x: clip;
-    margin-inline: auto;
-    padding: 0.125rem 0.5rem 0.25rem;
-    display: flex;
-    justify-content: center;
-    align-items: flex-start;
-    background: transparent;
+    min-height: 0;
     border: 0;
     box-shadow: none;
   }
 
-  .trust-reviews-widget__ambient {
-    position: absolute;
-    left: 50%;
-    top: 48%;
-    z-index: 0;
-    width: min(100%, 22rem);
-    height: 78%;
-    transform: translate(-50%, -50%);
-    pointer-events: none;
-    border-radius: 50%;
-    background:
-      radial-gradient(
-        ellipse 100% 85% at 50% 42%,
-        color-mix(in srgb, var(--green-700) 7%, transparent) 0%,
-        transparent 74%
-      ),
-      radial-gradient(
-        ellipse 72% 58% at 82% 68%,
-        color-mix(in srgb, var(--gold-warm) 12%, transparent) 0%,
-        transparent 70%
-      ),
-      radial-gradient(
-        ellipse 64% 52% at 14% 32%,
-        color-mix(in srgb, var(--cream-dark) 55%, transparent) 0%,
-        transparent 72%
-      );
-    filter: blur(26px);
-    opacity: 0.95;
-  }
-
-  .trust-reviews-widget--mobile iframe {
-    position: relative;
-    z-index: 1;
+  .reviews-mobile-wrap iframe {
     display: block;
     width: 100%;
     max-width: 100%;
-    margin-inline: auto;
-    background: transparent !important;
+    margin: 0;
+    padding: 0;
     border: 0;
+    background: transparent !important;
     box-shadow: none;
+  }
+
+  .trust-reviews-widget {
+    background: transparent !important;
+    min-height: 0;
   }
 }
 

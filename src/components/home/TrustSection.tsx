@@ -14,7 +14,7 @@ export function TrustSection() {
             <div className="w-full max-w-xl mx-auto max-lg:max-w-full max-lg:overflow-x-clip max-lg:bg-transparent">
               <MoveFlowReviewsBadge />
             </div>
-            {/* Desktop only — mobile review-card embed includes profile link */}
+            {/* Desktop only — mobile-compact embed includes profile link */}
             <a
               href={MOVEFLOW_REVIEWS_URL}
               target="_blank"
