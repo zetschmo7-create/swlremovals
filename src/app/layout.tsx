@@ -1,15 +1,10 @@
 import type { Metadata } from "next";
 import { DM_Sans, Sora } from "next/font/google";
 import "./globals.css";
-import { Header } from "@/components/layout/Header";
-import { Footer } from "@/components/layout/Footer";
-import { MobileCTABar } from "@/components/layout/MobileCTABar";
-import { WhatsAppFloat } from "@/components/layout/WhatsAppFloat";
-import { StickyQuoteCTA } from "@/components/layout/StickyQuoteCTA";
+import { SiteShell } from "@/components/layout/SiteShell";
 import { GoogleAnalytics } from "@/components/analytics/GoogleAnalytics";
 import { SeoFlowTracking } from "@/components/analytics/SeoFlowTracking";
 import { LocalBusinessSchema } from "@/components/seo/LocalBusinessSchema";
-import { MoveFlowModalProvider } from "@/context/MoveFlowModalContext";
 import { defaultMetadata } from "@/lib/seo";
 import { IMAGES } from "@/lib/images";
 
@@ -62,16 +57,7 @@ export default function RootLayout({
         >
           Skip to main content
         </a>
-        <MoveFlowModalProvider>
-          <Header />
-          <main id="main-content" className="flex-1">
-            {children}
-          </main>
-          <Footer />
-          <StickyQuoteCTA />
-          <MobileCTABar />
-          <WhatsAppFloat />
-        </MoveFlowModalProvider>
+        <SiteShell>{children}</SiteShell>
       </body>
     </html>
   );
