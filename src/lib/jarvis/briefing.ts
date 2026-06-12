@@ -10,7 +10,10 @@ import { buildValueConfirmationTasks } from "./payday";
 import { detectEmailEvents } from "./email-events";
 import { buildJobLedger } from "./job-ledger";
 import {
-  buildCmmSpend,
+  loadCmmLeadIntelligence,
+  cmmSpendFromIntelligence,
+} from "./cmm-analytics";
+import {
   buildCommissionForecastFromLedger,
   buildDataQuality,
   buildHotLeadsFromLedger,
@@ -205,7 +208,8 @@ export async function generateJarvisBriefing(): Promise<JarvisBriefing> {
   const moveTracker = buildMoveTrackerFromLedger(jobs, commissionRate);
   const commissionForecast = buildCommissionForecastFromLedger(jobs, commissionRate);
   const postcodeAnalytics = buildPostcodeAnalytics(jobs, settings, 30);
-  const cmmSpend = buildCmmSpend(jobs, settings);
+  const cmmLeadIntelligence = await loadCmmLeadIntelligence(jobs, settings);
+  const cmmSpend = cmmSpendFromIntelligence(cmmLeadIntelligence);
   const gmailConnected =
     (gmailStatus.main.connected ? 1 : 0) + (gmailStatus.appointments.connected ? 1 : 0);
   const dataQuality = buildDataQuality(
@@ -326,6 +330,7 @@ export async function generateJarvisBriefing(): Promise<JarvisBriefing> {
     dataQuality,
     postcodeAnalytics,
     cmmSpend,
+    cmmLeadIntelligence,
   };
 
   const { script, focus } = buildExecutiveBriefing(briefingBase);

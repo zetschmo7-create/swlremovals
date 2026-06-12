@@ -10,7 +10,8 @@ import {
   TrafficLight,
 } from "./jarvis-ui";
 import { AskJarvis } from "./AskJarvis";
-import { CmmSpendPanel, DataQualityPanel } from "./LedgerPanels";
+import { DataQualityPanel } from "./LedgerPanels";
+import { CmmLeadIntelligencePanel } from "./CmmLeadIntelligence";
 
 const BUCKET_LABELS: Record<TaskBucket, string> = {
   jarvis: "AutoPilot",
@@ -28,7 +29,13 @@ function confidenceBadge(confidence: "high" | "medium" | "none") {
   return "bg-slate-500/20 text-slate-400";
 }
 
-export function JarvisHomeView({ briefing }: { briefing: JarvisBriefing }) {
+export function JarvisHomeView({
+  briefing,
+  onRefresh,
+}: {
+  briefing: JarvisBriefing;
+  onRefresh?: () => void;
+}) {
   const { executive, payday, commissionForecast } = briefing;
   const jakeTasks = briefing.tasks.jake.slice(0, 6);
   const hotLeads = briefing.hotLeads.leads.slice(0, 4);
@@ -286,7 +293,7 @@ export function JarvisHomeView({ briefing }: { briefing: JarvisBriefing }) {
         )}
       </Section>
 
-      <CmmSpendPanel briefing={briefing} />
+      <CmmLeadIntelligencePanel briefing={briefing} onRefresh={onRefresh} />
 
       <AskJarvis briefing={briefing} />
 

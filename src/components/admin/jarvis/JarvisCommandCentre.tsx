@@ -17,7 +17,7 @@ export function JarvisCommandCentre({
 
   return (
     <>
-      <JarvisHomeView briefing={briefing} />
+      <JarvisHomeView briefing={briefing} onRefresh={onSettingsSaved} />
 
       <div className="mt-8">
         <button

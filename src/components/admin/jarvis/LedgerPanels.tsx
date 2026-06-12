@@ -44,27 +44,6 @@ function Metric({ label, value }: { label: string; value: number }) {
   );
 }
 
-export function CmmSpendPanel({ briefing }: { briefing: JarvisBriefing }) {
-  const s = briefing.cmmSpend;
-  return (
-    <Section title="CMM Company Lead Spend" subtitle="Not Jake's personal expense">
-      <div className="grid gap-4 sm:grid-cols-3">
-        <div className="jarvis-glass rounded-xl p-4">
-          <p className="text-xs text-slate-500">Today</p>
-          <p className="text-xl font-semibold text-white">{formatCurrency(s.today)}</p>
-        </div>
-        <div className="jarvis-glass rounded-xl p-4">
-          <p className="text-xs text-slate-500">This week</p>
-          <p className="text-xl font-semibold text-white">{formatCurrency(s.thisWeek)}</p>
-        </div>
-        <div className="jarvis-glass rounded-xl p-4">
-          <p className="text-xs text-slate-500">This month</p>
-          <p className="text-xl font-semibold text-white">{formatCurrency(s.thisMonth)}</p>
-        </div>
-      </div>
-    </Section>
-  );
-}
 
 export function JobLedgerTable({ jobs }: { jobs: JobRecord[] }) {
   const payday = getPaydayInfo();

@@ -16,6 +16,7 @@ import {
   JobLedgerTable,
   PostcodePerformancePanel,
 } from "./LedgerPanels";
+import { CmmHistoricalAnalytics } from "./CmmLeadIntelligence";
 
 const BUCKET_META: Record<TaskBucket, { title: string; accent: string }> = {
   jarvis: { title: "AutoPilot", accent: "text-cyan-300" },
@@ -232,6 +233,8 @@ export function JarvisFullAnalytics({
       </Section>
 
       <JobLedgerTable jobs={briefing.jobLedger.jobs} />
+
+      <CmmHistoricalAnalytics briefing={briefing} />
 
       <PostcodePerformancePanel briefing={briefing} />
 

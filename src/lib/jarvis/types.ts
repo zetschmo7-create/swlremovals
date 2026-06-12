@@ -5,6 +5,93 @@ export type JarvisAccount = "main" | "appointments";
 
 export type PostcodeArea = "GU" | "RH" | "TN" | "SM" | "CR" | "Other" | "Unknown";
 
+export type CmmLeadRecord = {
+  lead_id: string;
+  gmail_message_id: string;
+  gmail_thread_id: string;
+  received_at: string;
+  received_date_key: string;
+  customer_name: string | null;
+  customer_email: string | null;
+  customer_phone: string | null;
+  collection_address: string | null;
+  collection_postcode: string | null;
+  collection_postcode_area: PostcodeArea;
+  delivery_address: string | null;
+  delivery_postcode: string | null;
+  move_date: string | null;
+  property_size: string | null;
+  external_lead_id: string | null;
+  lead_source: string;
+  lead_cost: number;
+  raw_subject: string;
+  raw_snippet: string;
+  confidence_score: number;
+  needs_review_reason: string | null;
+};
+
+export type CmmLeadLedger = {
+  leads: CmmLeadRecord[];
+  version: number;
+};
+
+export type CmmSyncMeta = {
+  messagesScanned: number;
+  leadsParsed: number;
+  duplicatesSkipped: number;
+  unknownPostcodes: number;
+  lastMessageDate: string | null;
+  labelFound: boolean;
+  lastSyncAt: string | null;
+  error: string | null;
+};
+
+export type CmmAreaPeriodStats = {
+  leads: number;
+  spend: number;
+};
+
+export type CmmAreaAnalytics = {
+  today: CmmAreaPeriodStats;
+  thisWeek: CmmAreaPeriodStats;
+  thisMonth: CmmAreaPeriodStats;
+  allTime: CmmAreaPeriodStats;
+  depositsPaid: number;
+  conversionRate: number | null;
+  turnover: number;
+  commission: number;
+  roi: number | null;
+  costPerPaidDeposit: number | null;
+  needsReview: boolean;
+};
+
+export type CmmLeadIntelligence = {
+  leadsToday: number;
+  leadsThisWeek: number;
+  leadsThisMonth: number;
+  leadsLast30Days: number;
+  leadsAllTime: number;
+  spendToday: number;
+  spendThisWeek: number;
+  spendThisMonth: number;
+  spendLast30Days: number;
+  spendAllTime: number;
+  unknownPostcodes: number;
+  byArea: Record<PostcodeArea, CmmAreaAnalytics>;
+  dailyChart: { labels: string[]; leads: number[]; spend: number[] };
+  weeklyChart: { labels: string[]; leads: number[]; spend: number[] };
+  monthlyChart: { labels: string[]; leads: number[]; spend: number[] };
+  topAreas: Array<{ area: PostcodeArea; leads: number; spend: number }>;
+  unknownPostcodeLeads: Array<{
+    customer_name: string | null;
+    received_at: string;
+    reason: string | null;
+  }>;
+  syncMeta: CmmSyncMeta;
+  needsSetup: boolean;
+  setupMessage: string | null;
+};
+
 export type JobStage =
   | "lead_received"
   | "survey_booked"
@@ -350,9 +437,12 @@ export type JarvisBriefing = {
     today: number;
     thisWeek: number;
     thisMonth: number;
+    last30Days: number;
+    allTime: number;
     byArea: Record<PostcodeArea, number>;
     label: string;
   };
+  cmmLeadIntelligence: CmmLeadIntelligence;
 };
 
 export type PdfDiagnosticEntry = {

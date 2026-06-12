@@ -23,9 +23,36 @@ export function answerJarvisQuestion(
     return "Ask me about leads, commission, CMM spend, postcode ROI, pipeline, surveys, or follow-ups.";
   }
 
-  if (/cmm leads.*gu|gu.*cmm leads|leads.*gu.*week/i.test(q)) {
-    const gu = briefing.postcodeAnalytics.areas.GU;
-    return `GU area: ${gu.leads} CMM leads this period. Company lead spend: ${formatCurrency(gu.spend)}.`;
+  const cmm = briefing.cmmLeadIntelligence;
+
+  if (/cmm leads.*today|how many cmm.*today|leads today/i.test(q)) {
+    return `CMM leads today: ${cmm.leadsToday}. Company marketing spend today: ${formatCurrency(cmm.spendToday)}.`;
+  }
+
+  if (/cmm leads.*week|how many cmm.*week|leads this week/i.test(q)) {
+    return `CMM leads this week: ${cmm.leadsThisWeek}. Company marketing spend this week: ${formatCurrency(cmm.spendThisWeek)}.`;
+  }
+
+  if (/cmm leads.*month|how many cmm.*month/i.test(q)) {
+    return `CMM leads this month: ${cmm.leadsThisMonth}. Company marketing spend this month: ${formatCurrency(cmm.spendThisMonth)}.`;
+  }
+
+  if (/cmm leads.*gu|gu.*cmm leads|leads.*gu.*week|how many rh/i.test(q)) {
+    const areaMatch = q.match(/\b(gu|rh|tn|sm|cr)\b/i);
+    const area = (areaMatch?.[1]?.toUpperCase() ?? "GU") as PostcodeArea;
+    const stats = cmm.byArea[area];
+    if (!stats) return `No CMM data for area ${area}.`;
+    return `${area} area: ${stats.thisWeek.leads} CMM leads this week (${stats.allTime.leads} all time). Company spend this month: ${formatCurrency(stats.thisMonth.spend)}.`;
+  }
+
+  if (/most leads|which postcode.*most|which area.*most|sends the most/i.test(q)) {
+    const top = cmm.topAreas[0];
+    if (!top) return "No CMM lead data yet — run Rebuild CMM Lead Ledger.";
+    return `Most CMM leads come from ${top.area}: ${top.leads} all time (${formatCurrency(top.spend)} company spend).`;
+  }
+
+  if (/unknown postcode/i.test(q)) {
+    return `${cmm.unknownPostcodes} CMM leads have unknown postcodes and need review.`;
   }
 
   if (/most profitable|best postcode|which postcode|which area/i.test(q)) {
@@ -41,9 +68,8 @@ export function answerJarvisQuestion(
     return `Most profitable area: ${area} — ROI ${formatPct(stats.roi)}, turnover ${formatCurrency(stats.turnover)}, company spend ${formatCurrency(stats.spend)}.`;
   }
 
-  if (/cmm spend|lead spend|marketing spend|spent on cmm/i.test(q)) {
-  const s = briefing.cmmSpend;
-    return `CMM company lead spend — Today: ${formatCurrency(s.today)}, This week: ${formatCurrency(s.thisWeek)}, This month: ${formatCurrency(s.thisMonth)}.`;
+  if (/cmm spend|lead spend|marketing spend|spent on cmm|how much.*cmm/i.test(q)) {
+    return `CMM company marketing spend — Today: ${formatCurrency(cmm.spendToday)}, This week: ${formatCurrency(cmm.spendThisWeek)}, This month: ${formatCurrency(cmm.spendThisMonth)}, All time: ${formatCurrency(cmm.spendAllTime)}.`;
   }
 
   if (/commission due|friday|payday|due this/i.test(q)) {
@@ -77,17 +103,19 @@ export function answerJarvisQuestion(
       .join("\n");
   }
 
-  if (/conversion rate|best conversion|area.*conversion/i.test(q)) {
-    const areas = Object.entries(briefing.postcodeAnalytics.areas) as [
+  if (/conversion rate|best conversion|area.*conversion|converts best/i.test(q)) {
+    const areas = Object.entries(cmm.byArea) as [
       PostcodeArea,
-      (typeof briefing.postcodeAnalytics.areas)[PostcodeArea],
+      (typeof cmm.byArea)[PostcodeArea],
     ][];
     const ranked = areas
-      .filter(([, a]) => a.conversionRate != null && a.leads > 0)
+      .filter(([, a]) => a.conversionRate != null && a.allTime.leads > 0 && !a.needsReview)
       .sort((a, b) => (b[1].conversionRate ?? 0) - (a[1].conversionRate ?? 0));
-    if (ranked.length === 0) return "Not enough data for area conversion rates.";
+    if (ranked.length === 0) {
+      return "Not enough reliable CMM-to-job matches for area conversion rates yet.";
+    }
     const [area, stats] = ranked[0];
-    return `Best conversion: ${area} at ${formatPct(stats.conversionRate)} (${stats.depositsPaid} deposits / ${stats.leads} leads).`;
+    return `Best CMM conversion: ${area} at ${formatPct(stats.conversionRate)} (${stats.depositsPaid} deposits / ${stats.allTime.leads} leads).`;
   }
 
   if (/call first|priority lead|hot lead|which lead/i.test(q)) {
