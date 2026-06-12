@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import {
   Bot,
   Calendar,
@@ -9,10 +10,11 @@ import {
   Mic,
   PoundSterling,
   RefreshCw,
-  User,
+  Settings,
   Clock,
 } from "lucide-react";
 import type { JarvisBriefing, JarvisTask, TaskBucket } from "@/lib/jarvis/types";
+import { GmailConnectionWidget } from "@/components/admin/jarvis/GmailConnectionWidget";
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat("en-GB", {
@@ -171,6 +173,13 @@ export function JarvisDashboard({ onLogout }: { onLogout: () => void }) {
         </div>
 
         <div className="flex flex-wrap gap-2">
+          <Link
+            href="/admin/jarvis/setup"
+            className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/80 transition-colors hover:bg-white/10"
+          >
+            <Settings className="h-4 w-4" strokeWidth={1.5} />
+            Gmail Setup
+          </Link>
           <button
             type="button"
             onClick={() => void loadBriefing()}
@@ -209,17 +218,27 @@ export function JarvisDashboard({ onLogout }: { onLogout: () => void }) {
         </div>
       )}
 
+      <section className="mb-6">
+        <GmailConnectionWidget />
+      </section>
+
       {briefing && !briefing.setup.gmailConfigured && (
         <div className="mb-6 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-4 text-sm text-amber-200">
           <p className="font-medium">Gmail not fully connected</p>
           <p className="mt-1 text-amber-200/70">
-            Missing: {briefing.setup.missing.join(", ") || "credentials"}
+            Connect both accounts to populate live metrics from the last 24 hours.
           </p>
           {briefing.setup.notes.map((note) => (
             <p key={note} className="mt-1 text-amber-200/60">
               {note}
             </p>
           ))}
+          <Link
+            href="/admin/jarvis/setup"
+            className="mt-3 inline-block font-medium text-amber-100 underline hover:text-white"
+          >
+            Open Gmail setup →
+          </Link>
         </div>
       )}
 
@@ -350,11 +369,6 @@ export function JarvisDashboard({ onLogout }: { onLogout: () => void }) {
             </div>
           </section>
 
-          <footer className="mt-8 flex items-center gap-2 text-xs text-white/25">
-            <User className="h-3.5 w-3.5" />
-            Connected accounts: Ryan main Gmail (CMM leads) ·
-            appointments@ryanremovals-surveys.com
-          </footer>
         </>
       ) : null}
     </div>

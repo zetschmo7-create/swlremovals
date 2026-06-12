@@ -1,45 +1,28 @@
 import { google, gmail_v1 } from "googleapis";
 import type { JarvisAccount, JarvisEmail } from "./types";
 import { JARVIS_CONFIG } from "./config";
+import { getGoogleOAuthCredentials } from "./oauth";
+import {
+  getGmailConnectionStatus,
+  getGmailRefreshToken,
+  type GmailConnectionStatus,
+} from "./token-store";
 
-type GmailEnv = {
+type GmailCredentials = {
   clientId: string;
   clientSecret: string;
-  mainRefreshToken: string;
-  appointmentsRefreshToken: string;
 };
 
-export function getGmailEnv(): GmailEnv | null {
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  const mainRefreshToken = process.env.GMAIL_MAIN_REFRESH_TOKEN;
-  const appointmentsRefreshToken = process.env.GMAIL_APPOINTMENTS_REFRESH_TOKEN;
-
-  if (!clientId || !clientSecret || !mainRefreshToken || !appointmentsRefreshToken) {
-    return null;
-  }
-
-  return {
-    clientId,
-    clientSecret,
-    mainRefreshToken,
-    appointmentsRefreshToken,
-  };
+async function getGmailCredentials(): Promise<GmailCredentials | null> {
+  return getGoogleOAuthCredentials();
 }
 
-export function getGmailSetupStatus(): { configured: boolean; missing: string[] } {
-  const missing: string[] = [];
-  if (!process.env.GOOGLE_CLIENT_ID) missing.push("GOOGLE_CLIENT_ID");
-  if (!process.env.GOOGLE_CLIENT_SECRET) missing.push("GOOGLE_CLIENT_SECRET");
-  if (!process.env.GMAIL_MAIN_REFRESH_TOKEN) missing.push("GMAIL_MAIN_REFRESH_TOKEN");
-  if (!process.env.GMAIL_APPOINTMENTS_REFRESH_TOKEN) {
-    missing.push("GMAIL_APPOINTMENTS_REFRESH_TOKEN");
-  }
-  return { configured: missing.length === 0, missing };
+export async function getGmailSetupStatus(): Promise<GmailConnectionStatus> {
+  return getGmailConnectionStatus();
 }
 
-function createGmailClient(refreshToken: string, env: GmailEnv) {
-  const oauth2 = new google.auth.OAuth2(env.clientId, env.clientSecret);
+function createGmailClient(refreshToken: string, creds: GmailCredentials) {
+  const oauth2 = new google.auth.OAuth2(creds.clientId, creds.clientSecret);
   oauth2.setCredentials({ refresh_token: refreshToken });
   return google.gmail({ version: "v1", auth: oauth2 });
 }
@@ -139,13 +122,20 @@ async function fetchAccountEmails(
 }
 
 export async function fetchJarvisEmails(): Promise<JarvisEmail[]> {
-  const env = getGmailEnv();
-  if (!env) return [];
+  const creds = await getGmailCredentials();
+  if (!creds) return [];
+
+  const [mainToken, appointmentsToken] = await Promise.all([
+    getGmailRefreshToken("main"),
+    getGmailRefreshToken("appointments"),
+  ]);
+
+  if (!mainToken || !appointmentsToken) return [];
 
   const lookbackQuery = `newer_than:${JARVIS_CONFIG.lookbackHours}h`;
 
-  const mainGmail = createGmailClient(env.mainRefreshToken, env);
-  const appointmentsGmail = createGmailClient(env.appointmentsRefreshToken, env);
+  const mainGmail = createGmailClient(mainToken, creds);
+  const appointmentsGmail = createGmailClient(appointmentsToken, creds);
 
   const cmmLabel = JARVIS_CONFIG.cmmLeadLabel.replace(/"/g, '\\"');
   const mainQuery = `label:"${cmmLabel}" ${lookbackQuery}`;

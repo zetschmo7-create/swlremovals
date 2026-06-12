@@ -67,24 +67,35 @@ That is your three-minute briefing. Have a strong day.`;
 }
 
 export async function generateJarvisBriefing(): Promise<JarvisBriefing> {
-  const gmailStatus = getGmailSetupStatus();
+  const gmailStatus = await getGmailSetupStatus();
   const notes: string[] = [];
 
   if (!isJarvisAuthConfigured()) {
     notes.push("Set JARVIS_ADMIN_PASSWORD and JARVIS_SESSION_SECRET in environment variables.");
   }
 
-  if (!gmailStatus.configured) {
+  if (!gmailStatus.googleOAuthConfigured) {
+    notes.push("Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in Vercel environment variables.");
+  }
+
+  if (!gmailStatus.storageReady) {
     notes.push(
-      "Gmail API credentials missing. Add Google OAuth client ID/secret and refresh tokens for both accounts."
+      "Link a Vercel KV database to persist Gmail connections across deployments."
     );
   }
 
+  if (!gmailStatus.fullyConnected) {
+    notes.push("Connect both Gmail accounts at /admin/jarvis/setup.");
+  }
+
   let emails: JarvisEmail[] = [];
-  if (gmailStatus.configured) {
+  let fetchFailed = false;
+
+  if (gmailStatus.fullyConnected && gmailStatus.googleOAuthConfigured) {
     try {
       emails = await fetchJarvisEmails();
     } catch (error) {
+      fetchFailed = true;
       const message = error instanceof Error ? error.message : "Unknown Gmail error";
       notes.push(`Gmail fetch failed: ${message}`);
     }
@@ -125,7 +136,20 @@ export async function generateJarvisBriefing(): Promise<JarvisBriefing> {
       depositPayments: summary.depositPayments,
     },
     setup: {
-      gmailConfigured: gmailStatus.configured && notes.every((n) => !n.startsWith("Gmail fetch failed")),
+      gmailConfigured:
+        gmailStatus.fullyConnected &&
+        gmailStatus.googleOAuthConfigured &&
+        !fetchFailed,
+      connections: {
+        main: {
+          connected: gmailStatus.main.connected,
+          email: gmailStatus.main.email,
+        },
+        appointments: {
+          connected: gmailStatus.appointments.connected,
+          email: gmailStatus.appointments.email,
+        },
+      },
       missing: gmailStatus.missing,
       notes,
     },

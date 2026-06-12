@@ -64,7 +64,21 @@ export type JarvisBriefing = {
   };
   setup: {
     gmailConfigured: boolean;
+    connections: {
+      main: { connected: boolean; email?: string };
+      appointments: { connected: boolean; email?: string };
+    };
     missing: string[];
     notes: string[];
   };
+};
+
+export type GmailConnectionStatusResponse = {
+  storageReady: boolean;
+  googleOAuthConfigured: boolean;
+  main: { connected: boolean; email?: string; connectedAt?: string };
+  appointments: { connected: boolean; email?: string; connectedAt?: string };
+  fullyConnected: boolean;
+  missing: string[];
+  redirectUri: string;
 };
