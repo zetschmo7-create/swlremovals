@@ -6,12 +6,12 @@ import type { JarvisBriefing } from "@/lib/jarvis/types";
 import { answerJarvisQuestion } from "@/lib/jarvis/ask-jarvis";
 
 const SUGGESTIONS = [
-  "Which leads should I call first?",
+  "How much did we spend on CMM this week?",
   "How much commission is due this Friday?",
-  "What is my pipeline value?",
-  "What GU survey slots are available?",
-  "Which quotes need follow-up?",
-  "What money is left on the table?",
+  "Which postcode is most profitable?",
+  "Which quotes were accepted but not deposit paid?",
+  "How many CMM leads came from GU this week?",
+  "Which jobs have deposit receipts but unknown values?",
 ];
 
 export function AskJarvis({ briefing }: { briefing: JarvisBriefing }) {

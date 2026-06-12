@@ -10,6 +10,7 @@ import {
   TrafficLight,
 } from "./jarvis-ui";
 import { AskJarvis } from "./AskJarvis";
+import { CmmSpendPanel, DataQualityPanel } from "./LedgerPanels";
 
 const BUCKET_LABELS: Record<TaskBucket, string> = {
   jarvis: "AutoPilot",
@@ -34,6 +35,8 @@ export function JarvisHomeView({ briefing }: { briefing: JarvisBriefing }) {
 
   return (
     <div className="space-y-2">
+      <DataQualityPanel briefing={briefing} />
+
       {/* Friday Payday */}
       <Section title="Friday Payday Tracker" subtitle={payday.nextPaydayLabel}>
         {payday.needsSetup ? (
@@ -163,6 +166,12 @@ export function JarvisHomeView({ briefing }: { briefing: JarvisBriefing }) {
             <NeedsSetup />
           </div>
         ) : (
+          <>
+          {briefing.dataQuality.funnelWarning && (
+            <p className="mb-4 rounded-lg border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+              {briefing.dataQuality.funnelWarning}
+            </p>
+          )}
           <div className="jarvis-glass flex flex-col items-center gap-1 rounded-xl p-6">
             {briefing.pipelineFunnel.stages.map((stage, i) => (
               <div key={stage.key} className="w-full max-w-md text-center">
@@ -185,6 +194,7 @@ export function JarvisHomeView({ briefing }: { briefing: JarvisBriefing }) {
               </div>
             ))}
           </div>
+          </>
         )}
       </Section>
 
@@ -275,6 +285,8 @@ export function JarvisHomeView({ briefing }: { briefing: JarvisBriefing }) {
           </div>
         )}
       </Section>
+
+      <CmmSpendPanel briefing={briefing} />
 
       <AskJarvis briefing={briefing} />
 

@@ -11,7 +11,7 @@ export type JarvisSettings = {
 export const DEFAULT_JARVIS_SETTINGS: JarvisSettings = {
   commissionPercent: 10,
   leadProviderName: "Compare My Move",
-  costPerLead: 0,
+  costPerLead: 10.95,
 };
 
 export async function getJarvisSettings(): Promise<JarvisSettings> {

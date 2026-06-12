@@ -9,6 +9,7 @@ const legacyAreaRedirects = [
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   compress: true,
+  serverExternalPackages: ["pdf-parse", "pdfjs-dist"],
   redirects: async () => legacyAreaRedirects,
   headers: async () => [
     {

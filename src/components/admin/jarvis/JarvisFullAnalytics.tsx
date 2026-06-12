@@ -12,6 +12,10 @@ import {
   Section,
   TrafficLight,
 } from "./jarvis-ui";
+import {
+  JobLedgerTable,
+  PostcodePerformancePanel,
+} from "./LedgerPanels";
 
 const BUCKET_META: Record<TaskBucket, { title: string; accent: string }> = {
   jarvis: { title: "AutoPilot", accent: "text-cyan-300" },
@@ -210,7 +214,7 @@ export function JarvisFullAnalytics({
 
         <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
           <KpiTile
-            label="Lead spend (30d)"
+            label="Company lead spend (30d)"
             value={
               briefing.roi.needsSetup ? (
                 <NeedsSetup />
@@ -219,10 +223,17 @@ export function JarvisFullAnalytics({
               )
             }
           />
-          <KpiTile label="ROI" value={formatPct(briefing.roi.roi)} />
-          <KpiTile label="Commission ROI" value={formatPct(briefing.roi.commissionRoi)} />
+          <KpiTile label="Company ROI" value={formatPct(briefing.roi.roi)} />
+          <KpiTile
+            label="Commission vs lead spend"
+            value={formatPct(briefing.roi.commissionRoi)}
+          />
         </div>
       </Section>
+
+      <JobLedgerTable jobs={briefing.jobLedger.jobs} />
+
+      <PostcodePerformancePanel briefing={briefing} />
 
       <Section title="Money Left on the Table">
         {briefing.missedRevenue.needsSetup ? (

@@ -1,20 +1,82 @@
+import type { PdfParseResult } from "./pdf-parser";
+
 export type JarvisAccount = "main" | "appointments";
+
+export type PostcodeArea = "GU" | "RH" | "TN" | "SM" | "CR" | "Other" | "Unknown";
+
+export type JobStage =
+  | "lead_received"
+  | "survey_booked"
+  | "quote_sent"
+  | "quote_accepted"
+  | "deposit_invoice_sent"
+  | "deposit_paid"
+  | "move_invoice_sent"
+  | "move_completed"
+  | "lost_or_declined"
+  | "needs_review";
+
+export type JobRecord = {
+  job_key: string;
+  job_reference: string | null;
+  customer_name: string | null;
+  customer_email: string | null;
+  lead_source: string | null;
+  lead_received_at: string | null;
+  moving_from_postcode: string | null;
+  moving_from_postcode_area: PostcodeArea;
+  moving_to_postcode: string | null;
+  survey_booked_at: string | null;
+  quote_sent_at: string | null;
+  quote_accepted_at: string | null;
+  deposit_invoice_sent_at: string | null;
+  deposit_receipt_received_at: string | null;
+  move_invoice_sent_at: string | null;
+  move_date: string | null;
+  quote_value: number | null;
+  deposit_value: number | null;
+  final_move_value: number | null;
+  commission_payable: boolean;
+  commission_value: number | null;
+  current_stage: JobStage;
+  source_emails: string[];
+  source_pdfs: string[];
+  confidence_score: number;
+  needs_manual_review_reason: string | null;
+  duplicate_ignored_events: string[];
+};
+
+export type JobLedger = {
+  jobs: JobRecord[];
+  audit: {
+    duplicateEventsIgnored: number;
+    pdfsParsed: number;
+    pdfsFailed: number;
+    pdfsMissing: number;
+    unknownValues: number;
+    jobsNeedingReview: number;
+    logs: string[];
+  };
+};
 
 export type JarvisEmail = {
   id: string;
   account: JarvisAccount;
+  threadId: string;
   subject: string;
   from: string;
   date: string;
   snippet: string;
   body: string;
   labels: string[];
+  parsedPdfs: PdfParseResult[];
 };
 
 export type EmailCategory =
   | "cmm_lead"
   | "survey_booking"
   | "quote_acceptance"
+  | "deposit_invoice"
   | "deposit_payment"
   | "operational"
   | "other";
@@ -257,6 +319,47 @@ export type JarvisBriefing = {
     missing: string[];
     notes: string[];
   };
+  jobLedger: JobLedger;
+  dataQuality: {
+    gmailAccountsConnected: number;
+    pdfsParsedToday: number;
+    jobsRequiringReview: number;
+    duplicateEventsIgnored: number;
+    unknownValues: number;
+    funnelWarning: string | null;
+  };
+  postcodeAnalytics: {
+    areas: Record<
+      PostcodeArea,
+      {
+        leads: number;
+        spend: number;
+        depositsPaid: number;
+        turnover: number;
+        commission: number;
+        conversionRate: number | null;
+        roi: number | null;
+      }
+    >;
+    needsSetup: boolean;
+  };
+  cmmSpend: {
+    today: number;
+    thisWeek: number;
+    thisMonth: number;
+    byArea: Record<PostcodeArea, number>;
+    label: string;
+  };
+};
+
+export type PdfDiagnosticEntry = {
+  emailSubject: string;
+  emailDate: string;
+  account: JarvisAccount;
+  filename: string;
+  status: PdfParseResult["status"];
+  fields: PdfParseResult["fields"];
+  log: string;
 };
 
 export type GmailConnectionStatusResponse = {

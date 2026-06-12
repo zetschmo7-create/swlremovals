@@ -5,33 +5,13 @@ import type {
   JarvisTask,
   TaskBucket,
 } from "./types";
-import { JARVIS_CONFIG } from "./config";
-
-const SURVEY_PATTERNS = [
-  /survey\s*(booked|booking|scheduled|confirmed|appointment)/i,
-  /video\s*survey/i,
-  /appointment\s*(booked|confirmed|scheduled)/i,
-  /booking\s*confirmation/i,
-  /survey\s*date/i,
-];
-
-const QUOTE_ACCEPT_PATTERNS = [
-  /quote\s*accepted/i,
-  /accepted\s*(your|the|our)\s*quote/i,
-  /quote\s*confirmation/i,
-  /confirmed\s*quote/i,
-  /booking\s*confirmed/i,
-  /move\s*confirmed/i,
-];
-
-const DEPOSIT_PATTERNS = [
-  /deposit\s*(received|paid|payment)/i,
-  /payment\s*received/i,
-  /paid\s*deposit/i,
-  /receipt/i,
-  /stripe|paypal|bank\s*transfer/i,
-  /£\s*[\d,]+(?:\.\d{2})?\s*(deposit|paid|received)/i,
-];
+import {
+  isCmmLeadEmail,
+  isDepositInvoiceEmail,
+  isDepositReceiptEmail,
+  isQuoteAcceptedEmail,
+  isSurveyBookingEmail,
+} from "./extractors";
 
 const AMOUNT_REGEX = /£\s*([\d,]+(?:\.\d{2})?)/g;
 
@@ -45,10 +25,6 @@ function extractAmounts(text: string): number[] {
   return amounts;
 }
 
-function matchesAny(text: string, patterns: RegExp[]): boolean {
-  return patterns.some((p) => p.test(text));
-}
-
 function classifyEmail(email: JarvisEmail): ClassifiedEmail {
   const text = `${email.subject} ${email.snippet} ${email.body}`;
   const extractedAmounts = extractAmounts(text);
@@ -56,25 +32,17 @@ function classifyEmail(email: JarvisEmail): ClassifiedEmail {
 
   let category: EmailCategory = "other";
 
-  if (
-    email.account === "main" ||
-    email.labels.some((l) =>
-      l.toLowerCase().includes(JARVIS_CONFIG.cmmLeadLabel.toLowerCase())
-    ) ||
-    /cmm|new\s*lead|compare\s*my\s*move/i.test(text)
-  ) {
-    if (email.account === "main" || /new\s*lead|cmm/i.test(text)) {
-      category = "cmm_lead";
-    }
-  }
-
-  if (category === "other" && matchesAny(text, DEPOSIT_PATTERNS)) {
+  if (isCmmLeadEmail(email)) {
+    category = "cmm_lead";
+  } else if (isDepositReceiptEmail(email)) {
     category = "deposit_payment";
-  } else if (category === "other" && matchesAny(text, QUOTE_ACCEPT_PATTERNS)) {
+  } else if (isDepositInvoiceEmail(email)) {
+    category = "deposit_invoice";
+  } else if (isQuoteAcceptedEmail(email)) {
     category = "quote_acceptance";
-  } else if (category === "other" && matchesAny(text, SURVEY_PATTERNS)) {
+  } else if (isSurveyBookingEmail(email)) {
     category = "survey_booking";
-  } else if (email.account === "appointments" && category === "other") {
+  } else if (email.account === "appointments") {
     category = "operational";
   }
 
@@ -85,7 +53,7 @@ function assignBucket(task: Omit<JarvisTask, "id">): TaskBucket {
   if (task.category === "cmm_lead" || task.category === "quote_acceptance") {
     return "jake";
   }
-  if (task.category === "deposit_payment") {
+  if (task.category === "deposit_payment" || task.category === "deposit_invoice") {
     return task.priority === "high" ? "jake" : "jarvis";
   }
   if (task.category === "survey_booking") {
@@ -155,6 +123,16 @@ export function buildTasks(classified: ClassifiedEmail[]): Record<TaskBucket, Ja
             "Process accepted quote",
             "Confirm move date, crew size, and send booking confirmation.",
             "high"
+          )
+        );
+        break;
+      case "deposit_invoice":
+        pushTask(
+          buildTask(
+            email,
+            "Deposit invoice sent — not yet paid",
+            "Deposit invoice detected. Awaiting customer payment receipt.",
+            "medium"
           )
         );
         break;
