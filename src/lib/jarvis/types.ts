@@ -1,4 +1,5 @@
-import type { PdfParseResult } from "./pdf-parser";
+import type { PdfParseResult, PdfParseStatus } from "./pdf-parser";
+import type { OperationalPdfCategory } from "./pdf-whitelist";
 
 export type JarvisAccount = "main" | "appointments";
 
@@ -323,6 +324,8 @@ export type JarvisBriefing = {
   dataQuality: {
     gmailAccountsConnected: number;
     pdfsParsedToday: number;
+    pdfValueExtractionNeedsSetup: boolean;
+    pdfExtractionNote: string | null;
     jobsRequiringReview: number;
     duplicateEventsIgnored: number;
     unknownValues: number;
@@ -355,9 +358,14 @@ export type JarvisBriefing = {
 export type PdfDiagnosticEntry = {
   emailSubject: string;
   emailDate: string;
+  emailFrom: string;
   account: JarvisAccount;
   filename: string;
-  status: PdfParseResult["status"];
+  status: PdfParseStatus;
+  category: OperationalPdfCategory | null;
+  reason: string;
+  textLength: number;
+  textPreview: string | null;
   fields: PdfParseResult["fields"];
   log: string;
 };

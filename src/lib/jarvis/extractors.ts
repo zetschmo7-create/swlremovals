@@ -133,18 +133,6 @@ export function isSurveyBookingEmail(email: JarvisEmail): boolean {
   );
 }
 
-export function isPdfRelevantEmail(email: JarvisEmail): boolean {
-  return (
-    isDepositInvoiceEmail(email) ||
-    isDepositReceiptEmail(email) ||
-    isQuoteAcceptedEmail(email) ||
-    isMoveInvoiceEmail(email) ||
-    /quotation|removal quote|deposit|receipt|invoice/i.test(
-      `${email.subject} ${email.snippet}`
-    )
-  );
-}
-
 export function extractCustomerName(email: ClassifiedEmail): string | null {
   const jarvisEmail: JarvisEmail = email;
   const cmm = extractCmmLeadCustomer(jarvisEmail);

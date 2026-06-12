@@ -56,10 +56,10 @@ export type EmailEvent = {
 function mergePdfFields(
   pdfs: PdfParseResult[]
 ): PdfExtractedFields | null {
-  const successful = pdfs.filter((p) => p.status === "success");
-  if (successful.length === 0) return null;
+  const parsed = pdfs.filter((p) => p.status === "parsed");
+  if (parsed.length === 0) return null;
 
-  const preferred = successful.sort((a, b) => {
+  const preferred = parsed.sort((a, b) => {
     const score = (name: string) => {
       const n = name.toLowerCase();
       if (/receipt/.test(n)) return 5;
@@ -174,7 +174,9 @@ export function detectEmailEvents(
     seenKeys.add(dedupKey);
 
     const pdfSource =
-      email.parsedPdfs?.find((p) => p.status === "success")?.filename ?? null;
+      email.parsedPdfs?.find(
+        (p) => p.status === "parsed" || p.status === "needs_review"
+      )?.filename ?? null;
 
     events.push({
       id: `${email.id}-${eventType}`,

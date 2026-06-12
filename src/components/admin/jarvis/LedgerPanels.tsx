@@ -21,6 +21,11 @@ export function DataQualityPanel({
         <Metric label="Duplicates ignored" value={dq.duplicateEventsIgnored} />
         <Metric label="Unknown values" value={dq.unknownValues} />
       </div>
+      {dq.pdfValueExtractionNeedsSetup && (
+        <p className="mt-4 rounded-lg border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+          {dq.pdfExtractionNote ?? "PDF value extraction needs setup."}
+        </p>
+      )}
       {dq.funnelWarning && (
         <p className="mt-4 rounded-lg border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
           {dq.funnelWarning} Funnel metrics are based on detected Gmail/PDF events and may need review.

@@ -7,7 +7,11 @@ import {
   getGmailRefreshToken,
   type GmailConnectionStatus,
 } from "./token-store";
-import { isPdfRelevantEmail } from "./extractors";
+import {
+  evaluatePdfAttachment,
+  ignoredPdfResult,
+  isPdfRelevantEmail,
+} from "./pdf-whitelist";
 import { parsePdfBuffer, type PdfParseResult } from "./pdf-parser";
 
 type GmailCredentials = {
@@ -118,7 +122,9 @@ async function parseMessagePdfs(
   gmail: gmail_v1.Gmail,
   messageId: string,
   payload: gmail_v1.Schema$MessagePart | undefined,
-  parsePdfs: boolean
+  emailStub: Pick<JarvisEmail, "subject" | "from" | "account">,
+  parsePdfs: boolean,
+  includeIgnored: boolean
 ): Promise<PdfParseResult[]> {
   if (!parsePdfs) return [];
 
@@ -127,12 +133,26 @@ async function parseMessagePdfs(
 
   const results: PdfParseResult[] = [];
   for (const part of parts) {
+    const decision = evaluatePdfAttachment(emailStub, part.filename);
+
+    if (!decision.shouldParse) {
+      if (includeIgnored) {
+        results.push(
+          ignoredPdfResult(part.filename, decision.reason, decision.category)
+        );
+      }
+      continue;
+    }
+
     const buffer = await downloadAttachment(gmail, messageId, part.attachmentId);
     if (!buffer) {
       results.push({
         filename: part.filename,
         status: "missing",
+        category: decision.category,
+        reason: decision.reason,
         text: null,
+        textLength: 0,
         fields: {
           jobReference: null,
           customerName: null,
@@ -151,7 +171,14 @@ async function parseMessagePdfs(
       });
       continue;
     }
-    results.push(await parsePdfBuffer(buffer, part.filename));
+
+    results.push(
+      await parsePdfBuffer(buffer, part.filename, {
+        category: decision.category,
+        reason: decision.reason,
+        subjectFallback: emailStub.subject,
+      })
+    );
   }
   return results;
 }
@@ -195,7 +222,7 @@ async function fetchAccountEmails(
   gmail: gmail_v1.Gmail,
   account: JarvisAccount,
   query: string,
-  options?: { parsePdfs?: boolean }
+  options?: { parsePdfs?: boolean; includeIgnoredPdfs?: boolean }
 ): Promise<JarvisEmail[]> {
   const labelMap = await buildLabelMap(gmail);
   const list = await gmail.users.messages.list({
@@ -219,12 +246,13 @@ async function fetchAccountEmails(
       const subject = getHeader(full.data.payload?.headers, "Subject");
       const snippet = full.data.snippet ?? "";
       const body = extractBody(full.data.payload);
+      const from = getHeader(full.data.payload?.headers, "From");
       const stub: JarvisEmail = {
         id: item.id,
         account,
         threadId: full.data.threadId ?? item.id,
         subject,
-        from: getHeader(full.data.payload?.headers, "From"),
+        from,
         date: getHeader(full.data.payload?.headers, "Date"),
         snippet,
         body,
@@ -232,14 +260,23 @@ async function fetchAccountEmails(
         parsedPdfs: [],
       };
 
+      const hasPdfParts =
+        collectAttachmentParts(full.data.payload).length > 0;
       const shouldParse =
-        options?.parsePdfs !== false && isPdfRelevantEmail(stub);
-      const parsedPdfs = await parseMessagePdfs(
-        gmail,
-        item.id,
-        full.data.payload,
-        shouldParse
-      );
+        options?.parsePdfs !== false &&
+        hasPdfParts &&
+        isPdfRelevantEmail(stub);
+
+      const parsedPdfs = shouldParse
+        ? await parseMessagePdfs(
+            gmail,
+            item.id,
+            full.data.payload,
+            stub,
+            true,
+            options?.includeIgnoredPdfs ?? false
+          )
+        : [];
 
       return mapMessage(full.data, account, labelMap, parsedPdfs);
     })
@@ -287,23 +324,44 @@ export async function fetchJarvisEmails(
   const [mainEmails, appointmentEmails] = await Promise.all([
     fetchAccountEmails(clients.main, "main", mainQuery, {
       parsePdfs: options?.parsePdfs,
+      includeIgnoredPdfs: false,
     }),
     fetchAccountEmails(clients.appointments, "appointments", appointmentsQuery, {
       parsePdfs: options?.parsePdfs,
+      includeIgnoredPdfs: false,
     }),
   ]);
 
   return [...mainEmails, ...appointmentEmails];
 }
 
+function toDiagnosticEntry(
+  email: Pick<JarvisEmail, "subject" | "date" | "account" | "from">,
+  result: PdfParseResult
+): PdfDiagnosticEntry {
+  return {
+    emailSubject: email.subject,
+    emailDate: email.date,
+    emailFrom: email.from,
+    account: email.account,
+    filename: result.filename,
+    status: result.status,
+    category: result.category,
+    reason: result.reason,
+    textLength: result.textLength,
+    textPreview: result.text ? result.text.slice(0, 500) : null,
+    fields: result.fields,
+    log: result.log,
+  };
+}
+
 export async function fetchPdfDiagnostics(
-  limit = 20
+  limit = 40
 ): Promise<PdfDiagnosticEntry[]> {
   const clients = await getGmailClients();
   if (!clients) return [];
 
-  const query =
-    'newer_than:30d (subject:"Deposit Invoice" OR subject:"Deposit Receipt" OR subject:"Quotation" OR subject:"Move Invoice" OR filename:pdf) has:attachment filename:pdf';
+  const query = "newer_than:30d has:attachment filename:pdf";
 
   const accounts: Array<{ gmail: gmail_v1.Gmail; account: JarvisAccount }> = [
     { gmail: clients.appointments, account: "appointments" },
@@ -316,7 +374,7 @@ export async function fetchPdfDiagnostics(
     const list = await gmail.users.messages.list({
       userId: "me",
       q: query,
-      maxResults: 50,
+      maxResults: 80,
     });
 
     for (const item of list.data.messages ?? []) {
@@ -330,43 +388,40 @@ export async function fetchPdfDiagnostics(
 
       const subject = getHeader(full.data.payload?.headers, "Subject");
       const date = getHeader(full.data.payload?.headers, "Date");
+      const from = getHeader(full.data.payload?.headers, "From");
       const parts = collectAttachmentParts(full.data.payload);
 
-      if (parts.length === 0) {
-        entries.push({
-          emailSubject: subject,
-          emailDate: date,
-          account,
-          filename: "(no PDF attachment)",
-          status: "missing",
-          fields: {
-            jobReference: null,
-            customerName: null,
-            customerEmail: null,
-            quoteValue: null,
-            depositValue: null,
-            balanceValue: null,
-            totalValue: null,
-            movingFromAddress: null,
-            movingFromPostcode: null,
-            movingToAddress: null,
-            movingToPostcode: null,
-            moveDate: null,
-          },
-          log: "PDF missing on relevant email",
-        });
-        continue;
-      }
+      const emailStub = { subject, from, account };
 
       for (const part of parts) {
         if (entries.length >= limit) break;
+
+        const decision = evaluatePdfAttachment(emailStub, part.filename);
+
+        if (!decision.shouldParse) {
+          entries.push(
+            toDiagnosticEntry(
+              { subject, date, account, from },
+              ignoredPdfResult(part.filename, decision.reason, decision.category)
+            )
+          );
+          continue;
+        }
+
         const buffer = await downloadAttachment(gmail, item.id, part.attachmentId);
         const result = buffer
-          ? await parsePdfBuffer(buffer, part.filename)
+          ? await parsePdfBuffer(buffer, part.filename, {
+              category: decision.category,
+              reason: decision.reason,
+              subjectFallback: subject,
+            })
           : {
               filename: part.filename,
               status: "missing" as const,
+              category: decision.category,
+              reason: decision.reason,
               text: null,
+              textLength: 0,
               fields: {
                 jobReference: null,
                 customerName: null,
@@ -384,18 +439,74 @@ export async function fetchPdfDiagnostics(
               log: `PDF missing: ${part.filename}`,
             };
 
-        entries.push({
-          emailSubject: subject,
-          emailDate: date,
-          account,
-          filename: result.filename,
-          status: result.status,
-          fields: result.fields,
-          log: result.log,
-        });
+        entries.push(
+          toDiagnosticEntry({ subject, date, account, from }, result)
+        );
       }
     }
   }
 
   return entries.slice(0, limit);
+}
+
+export async function testPdfAttachment(
+  account: JarvisAccount,
+  messageId: string,
+  attachmentId: string,
+  filename: string,
+  subject: string,
+  from: string
+): Promise<PdfDiagnosticEntry> {
+  const clients = await getGmailClients();
+  if (!clients) {
+    throw new Error("Gmail not connected");
+  }
+
+  const gmail = account === "main" ? clients.main : clients.appointments;
+  const decision = evaluatePdfAttachment({ subject, from, account }, filename);
+
+  if (!decision.shouldParse) {
+    return toDiagnosticEntry(
+      { subject, date: "", account, from },
+      ignoredPdfResult(filename, decision.reason, decision.category)
+    );
+  }
+
+  const buffer = await downloadAttachment(gmail, messageId, attachmentId);
+  if (!buffer) {
+    return toDiagnosticEntry(
+      { subject, date: "", account, from },
+      {
+        filename,
+        status: "missing",
+        category: decision.category,
+        reason: decision.reason,
+        text: null,
+        textLength: 0,
+        fields: {
+          jobReference: null,
+          customerName: null,
+          customerEmail: null,
+          quoteValue: null,
+          depositValue: null,
+          balanceValue: null,
+          totalValue: null,
+          movingFromAddress: null,
+          movingFromPostcode: null,
+          movingToAddress: null,
+          movingToPostcode: null,
+          moveDate: null,
+        },
+        log: `PDF missing: ${filename}`,
+      }
+    );
+  }
+
+  const result = await parsePdfBuffer(buffer, filename, {
+    category: decision.category,
+    reason: decision.reason,
+    subjectFallback: subject,
+  });
+
+  return toDiagnosticEntry({ subject, date: "", account, from }, result);
 }

@@ -307,9 +307,14 @@ export function buildDataQuality(
     (l) => l.includes("parsed successfully") && l.includes(today)
   ).length;
 
+  const pdfsParsed = pdfsParsedToday || ledger.audit.pdfsParsed;
+
   return {
     gmailAccountsConnected: gmailConnected,
-    pdfsParsedToday: pdfsParsedToday || ledger.audit.pdfsParsed,
+    pdfsParsedToday: pdfsParsed,
+    pdfValueExtractionNeedsSetup: pdfsParsed === 0,
+    pdfExtractionNote:
+      pdfsParsed === 0 ? "PDF value extraction needs setup." : null,
     jobsRequiringReview: ledger.audit.jobsNeedingReview,
     duplicateEventsIgnored: ledger.audit.duplicateEventsIgnored,
     unknownValues: ledger.audit.unknownValues,
@@ -526,20 +531,27 @@ export function buildMoveTrackerFromLedger(jobs: JobRecord[], commissionRate: nu
   };
 }
 
-export function collectPdfAudit(emails: { parsedPdfs: { status: string; log: string }[] }[]) {
+export function collectPdfAudit(
+  emails: { parsedPdfs: { status: string; log: string }[] }[]
+) {
   let parsed = 0;
   let failed = 0;
   let missing = 0;
+  let ignored = 0;
   const logs: string[] = [];
 
   for (const email of emails) {
     for (const pdf of email.parsedPdfs) {
+      if (pdf.status === "ignored_not_relevant") {
+        ignored += 1;
+        continue;
+      }
       logs.push(pdf.log);
-      if (pdf.status === "success") parsed += 1;
-      else if (pdf.status === "failed" || pdf.status === "no_text") failed += 1;
+      if (pdf.status === "parsed") parsed += 1;
+      else if (pdf.status === "needs_review") failed += 1;
       else if (pdf.status === "missing") missing += 1;
     }
   }
 
-  return { parsed, failed, missing, logs };
+  return { parsed, failed, missing, ignored, logs };
 }
