@@ -132,7 +132,7 @@ export function buildTasks(classified: ClassifiedEmail[]): Record<TaskBucket, Ja
         pushTask(
           buildTask(
             email,
-            "Call new CMM lead",
+            "High-value phone call — new CMM lead",
             "Respond to Compare My Move lead within 2 hours.",
             "high"
           )
@@ -142,7 +142,7 @@ export function buildTasks(classified: ClassifiedEmail[]): Record<TaskBucket, Ja
         pushTask(
           buildTask(
             email,
-            "Confirm survey slot",
+            "Draft survey confirmation",
             "Verify calendar entry and send pre-survey checklist.",
             "medium"
           )
@@ -170,11 +170,29 @@ export function buildTasks(classified: ClassifiedEmail[]): Record<TaskBucket, Ja
           )
         );
         break;
-      case "operational":
-        buckets.wait.push(
-          buildTask(email, "Review operational email", "Scan for action items not auto-classified.", "low")
-        );
+      case "operational": {
+        const text = `${email.subject} ${email.snippet}`.toLowerCase();
+        if (/quote|follow.?up|deposit/i.test(text)) {
+          pushTask(
+            buildTask(
+              email,
+              "Draft quote follow-up",
+              "Customer may be waiting on quote or deposit reminder.",
+              "medium"
+            )
+          );
+        } else {
+          buckets.wait.push(
+            buildTask(
+              email,
+              "Low-priority admin review",
+              "Non-urgent operational email.",
+              "low"
+            )
+          );
+        }
         break;
+      }
       default:
         break;
     }

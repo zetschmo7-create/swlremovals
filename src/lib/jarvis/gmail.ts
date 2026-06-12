@@ -121,7 +121,9 @@ async function fetchAccountEmails(
   return messages.filter((m): m is JarvisEmail => m !== null);
 }
 
-export async function fetchJarvisEmails(): Promise<JarvisEmail[]> {
+export async function fetchJarvisEmails(
+  options?: { days?: number }
+): Promise<JarvisEmail[]> {
   const creds = await getGmailCredentials();
   if (!creds) return [];
 
@@ -132,7 +134,11 @@ export async function fetchJarvisEmails(): Promise<JarvisEmail[]> {
 
   if (!mainToken || !appointmentsToken) return [];
 
-  const lookbackQuery = `newer_than:${JARVIS_CONFIG.lookbackHours}h`;
+  const days = options?.days ?? 1;
+  const lookbackQuery =
+    days <= 1
+      ? `newer_than:${JARVIS_CONFIG.lookbackHours}h`
+      : `newer_than:${days}d`;
 
   const mainGmail = createGmailClient(mainToken, creds);
   const appointmentsGmail = createGmailClient(appointmentsToken, creds);

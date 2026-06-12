@@ -32,6 +32,12 @@ export type JarvisTask = {
   source: string;
   category: EmailCategory | "system";
   priority: "high" | "medium" | "low";
+  customer?: string;
+  revenueImpact?: number | null;
+  priorityScore?: number;
+  reason?: string;
+  suggestedAction?: string;
+  potentialCommission?: number | null;
 };
 
 export type TaskBucket = "jarvis" | "jake" | "wait";
@@ -50,12 +56,192 @@ export type JarvisScorecard = {
   totalCommission: number;
 };
 
+export type PeriodMetrics = {
+  leads: number;
+  surveys: number;
+  quotesAccepted: number;
+  depositsReceived: number;
+  turnoverClosed: number;
+  commissionEarned: number;
+  outstandingQuoteValue: number;
+};
+
+export type RevenuePeriods = {
+  last24h: PeriodMetrics;
+  last7d: PeriodMetrics;
+  last30d: PeriodMetrics;
+};
+
+export type ExecutiveSnapshot = {
+  today: {
+    newLeads: number;
+    surveysBooked: number;
+    depositsReceived: number;
+    estimatedCommission: number;
+  };
+  thisWeek: {
+    newLeads: number;
+    surveysBooked: number;
+    depositsReceived: number;
+    estimatedCommission: number;
+  };
+  pipeline: {
+    outstandingQuoteValue: number;
+    hotOpportunityValue: number;
+  };
+  actions: {
+    jarvisCount: number;
+    jakeCount: number;
+  };
+  health: {
+    score: number | null;
+    status: "green" | "amber" | "red" | "needs_setup";
+    label: string;
+    factors: string[];
+  };
+};
+
 export type JarvisBriefing = {
   generatedAt: string;
   business: string;
+  version: "v2";
   scorecard: JarvisScorecard;
+  executive: ExecutiveSnapshot;
+  revenue: RevenuePeriods;
+  roi: {
+    leadSpend: number;
+    revenuePerLead: number | null;
+    commissionPerLead: number | null;
+    roi: number | null;
+    commissionRoi: number | null;
+    needsSetup: boolean;
+  };
+  settings: {
+    commissionPercent: number;
+    leadProviderName: string;
+    costPerLead: number;
+  };
+  missedRevenue: {
+    opportunities: Array<{
+      id: string;
+      customer: string;
+      reason: string;
+      potentialTurnover: number | null;
+      potentialCommission: number | null;
+    }>;
+    totalMissedTurnover: number | null;
+    totalMissedCommission: number | null;
+    needsSetup: boolean;
+  };
+  hotLeads: {
+    leads: Array<{
+      id: string;
+      customer: string;
+      potentialValue: number | null;
+      reason: string;
+      recommendedAction: string;
+      conversionProbability: number | null;
+    }>;
+    needsSetup: boolean;
+  };
+  leadTracker: {
+    leads: Array<{
+      id: string;
+      customer: string;
+      leadReceived: string;
+      lastActivity: string;
+      status: "red" | "amber" | "green";
+      statusLabel: string;
+    }>;
+    unanswered: number;
+    awaiting: number;
+    converted: number;
+    needsSetup: boolean;
+  };
+  surveyIntelligence: {
+    slots: Record<
+      "GU" | "RH" | "TN",
+      Array<{
+        zone: "GU" | "RH" | "TN";
+        date: string;
+        dateLabel: string;
+        time: string;
+        confidence: "high" | "medium" | "none";
+        reasoning: string;
+        existingBookings: string[];
+      }>
+    >;
+    needsSetup: boolean;
+  };
+  payday: {
+    commissionEarnedThisWeek: number;
+    commissionDueThisFriday: number;
+    commissionPaidThisMonth: number | null;
+    commissionPaidNeedsSetup: boolean;
+    depositsReceivedThisWeek: number;
+    jobsPayableThisWeek: number;
+    turnoverMadePayableThisWeek: number;
+    turnoverDueThisFriday: number;
+    nextPayday: string;
+    nextPaydayLabel: string;
+    daysUntilPayday: number;
+    summaryLine: string;
+    needsConfirmation: Array<{
+      id: string;
+      customer: string;
+      depositReceivedAt: string;
+      moveValue: number | null;
+      valueNeedsConfirmation: boolean;
+      commission: number | null;
+    }>;
+    payableBookings: Array<{
+      id: string;
+      customer: string;
+      depositReceivedAt: string;
+      moveValue: number | null;
+      valueNeedsConfirmation: boolean;
+      commission: number | null;
+    }>;
+    needsSetup: boolean;
+  };
+  commissionForecast: {
+    earned: number;
+    likely: number;
+    possible: number;
+    stretch: number;
+    needsSetup: boolean;
+  };
+  pipelineFunnel: {
+    stages: Array<{
+      key: string;
+      label: string;
+      count: number;
+      conversionFromPrevious: number | null;
+    }>;
+    movesCompletedDetectable: boolean;
+    needsSetup: boolean;
+  };
+  moveTracker: {
+    movesToday: number | null;
+    movesTomorrow: number | null;
+    movesThisWeek: number | null;
+    completedThisWeek: number | null;
+    turnoverDelivered: number | null;
+    commissionSecured: number | null;
+    needsSetup: boolean;
+  };
+  charts: {
+    labels: string[];
+    leads: number[];
+    revenue: number[];
+    commission: number[];
+    pipeline: number[];
+    healthTrend: number[];
+    needsSetup: boolean;
+  };
   tasks: Record<TaskBucket, JarvisTask[]>;
   morningScript: string;
+  todaysFocus: string[];
   emails: {
     cmmLeads: ClassifiedEmail[];
     surveyBookings: ClassifiedEmail[];
