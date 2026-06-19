@@ -92,6 +92,50 @@ export type CmmLeadIntelligence = {
   setupMessage: string | null;
 };
 
+export type SalesGptIntent =
+  | "call_script"
+  | "sms"
+  | "email"
+  | "objection"
+  | "survey_pitch"
+  | "deposit_chase"
+  | "follow_up"
+  | "freeform";
+
+export type SalesContext = {
+  customerName: string | null;
+  customerEmail: string | null;
+  customerPhone: string | null;
+  collectionPostcode: string | null;
+  collectionPostcodeArea: PostcodeArea | null;
+  deliveryPostcode: string | null;
+  moveDate: string | null;
+  propertySize: string | null;
+  pipelineStage: string;
+  quoteValue: number | null;
+  depositPaid: boolean;
+  jobReference: string | null;
+  leadSource: string | null;
+  surveySlots: string[];
+  dataConfidence: "high" | "medium" | "low";
+  missingFields: string[];
+  jobKey: string | null;
+  leadId: string | null;
+  businessName: string;
+};
+
+export type SalesGptResponse = {
+  reply: string;
+  suggestedActions: string[];
+  warnings: string[];
+  contextUsed: {
+    jobKey: string | null;
+    leadId: string | null;
+    pipelineStage: string;
+    dataConfidence: string;
+  };
+};
+
 export type JobStage =
   | "lead_received"
   | "survey_booked"

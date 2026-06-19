@@ -9,7 +9,7 @@ import {
   Section,
   TrafficLight,
 } from "./jarvis-ui";
-import { AskJarvis } from "./AskJarvis";
+import { JarvisAssistant } from "./JarvisAssistant";
 import { DataQualityPanel } from "./LedgerPanels";
 import { CmmLeadIntelligencePanel } from "./CmmLeadIntelligence";
 
@@ -295,7 +295,7 @@ export function JarvisHomeView({
 
       <CmmLeadIntelligencePanel briefing={briefing} onRefresh={onRefresh} />
 
-      <AskJarvis briefing={briefing} />
+      <JarvisAssistant briefing={briefing} />
 
       {/* Morning briefing */}
       <Section title="Morning Briefing">
