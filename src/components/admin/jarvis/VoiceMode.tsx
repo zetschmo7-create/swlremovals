@@ -159,6 +159,7 @@ export function VoiceMode({ briefing }: { briefing: JarvisBriefing }) {
     string | null
   >(null);
   const [ttsError, setTtsError] = useState<string | null>(null);
+  const [ttsTesting, setTtsTesting] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(false);
   const [debugInfo, setDebugInfo] = useState<VoiceDebugInfo>(INITIAL_DEBUG);
   const [rawMicTesting, setRawMicTesting] = useState(false);
@@ -269,6 +270,85 @@ export function VoiceMode({ briefing }: { briefing: JarvisBriefing }) {
     }
   }, [cleanupAudio]);
 
+  const playTtsBlob = useCallback(
+    async (blob: Blob, sessionId: number): Promise<void> => {
+      const url = URL.createObjectURL(blob);
+      objectUrlRef.current = url;
+
+      const audio = new Audio(url);
+      audioRef.current = audio;
+
+      await new Promise<void>((resolve, reject) => {
+        const finish = () => {
+          if (sessionId !== speakSessionRef.current) {
+            resolve();
+            return;
+          }
+          resolve();
+        };
+        audio.onended = finish;
+        audio.onerror = () => {
+          if (sessionId !== speakSessionRef.current) {
+            resolve();
+            return;
+          }
+          reject(new Error("Audio playback failed"));
+        };
+        void audio.play().catch((err) => {
+          if (sessionId !== speakSessionRef.current) {
+            resolve();
+            return;
+          }
+          reject(err);
+        });
+      });
+    },
+    []
+  );
+
+  const requestTts = useCallback(
+    async (payload: { text?: string; test?: boolean }): Promise<Blob> => {
+      const res = await fetch("/api/jarvis/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const json = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(json.error ?? `ElevenLabs TTS failed (${res.status})`);
+      }
+
+      return res.blob();
+    },
+    []
+  );
+
+  const testElevenLabsTts = useCallback(async () => {
+    const sessionId = speakSessionRef.current + 1;
+    speakSessionRef.current = sessionId;
+    setTtsTesting(true);
+    setTtsError(null);
+    cleanupAudio();
+
+    try {
+      const blob = await requestTts({ test: true });
+      if (sessionId !== speakSessionRef.current) return;
+      await playTtsBlob(blob, sessionId);
+      setStatusNote("ElevenLabs test playback succeeded.");
+    } catch (error) {
+      if (sessionId !== speakSessionRef.current) return;
+      const message =
+        error instanceof Error ? error.message : "ElevenLabs test failed";
+      setTtsError(message);
+    } finally {
+      if (sessionId === speakSessionRef.current) {
+        cleanupAudio();
+      }
+      setTtsTesting(false);
+    }
+  }, [cleanupAudio, playTtsBlob, requestTts]);
+
   const speakAnswer = useCallback(
     async (text: string): Promise<void> => {
       const sessionId = speakSessionRef.current + 1;
@@ -279,52 +359,11 @@ export function VoiceMode({ briefing }: { briefing: JarvisBriefing }) {
       setVoiceState("speaking");
 
       try {
-        const res = await fetch("/api/jarvis/tts", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: trimForTts(text) }),
-        });
+        const blob = await requestTts({ text: trimForTts(text) });
 
         if (sessionId !== speakSessionRef.current) return;
 
-        if (!res.ok) {
-          const json = (await res.json().catch(() => ({}))) as { error?: string };
-          throw new Error(json.error ?? "Voice playback failed");
-        }
-
-        const blob = await res.blob();
-        if (sessionId !== speakSessionRef.current) return;
-
-        const url = URL.createObjectURL(blob);
-        objectUrlRef.current = url;
-
-        const audio = new Audio(url);
-        audioRef.current = audio;
-
-        await new Promise<void>((resolve, reject) => {
-          const finish = () => {
-            if (sessionId !== speakSessionRef.current) {
-              resolve();
-              return;
-            }
-            resolve();
-          };
-          audio.onended = finish;
-          audio.onerror = () => {
-            if (sessionId !== speakSessionRef.current) {
-              resolve();
-              return;
-            }
-            reject(new Error("Audio playback failed"));
-          };
-          void audio.play().catch((err) => {
-            if (sessionId !== speakSessionRef.current) {
-              resolve();
-              return;
-            }
-            reject(err);
-          });
-        });
+        await playTtsBlob(blob, sessionId);
       } catch (error) {
         if (sessionId !== speakSessionRef.current) return;
         const message =
@@ -336,7 +375,7 @@ export function VoiceMode({ briefing }: { briefing: JarvisBriefing }) {
         }
       }
     },
-    [cleanupAudio]
+    [cleanupAudio, playTtsBlob, requestTts]
   );
 
   const processQuestion = useCallback(
@@ -723,6 +762,15 @@ export function VoiceMode({ briefing }: { briefing: JarvisBriefing }) {
           <Mic className="h-4 w-4" />
           {rawMicTesting ? "Testing mic…" : "Test raw microphone"}
         </button>
+        <button
+          type="button"
+          disabled={ttsTesting}
+          onClick={() => void testElevenLabsTts()}
+          className="inline-flex items-center gap-2 rounded-lg border border-emerald-500/40 px-4 py-2.5 text-sm text-emerald-200 hover:bg-emerald-950/40 disabled:opacity-50"
+        >
+          <Volume2 className="h-4 w-4" />
+          {ttsTesting ? "Testing TTS…" : "Test ElevenLabs TTS"}
+        </button>
         {showRetry && (
           <button
             type="button"
@@ -753,9 +801,15 @@ export function VoiceMode({ briefing }: { briefing: JarvisBriefing }) {
         <p className="mt-3 text-sm text-amber-300/90">{statusNote}</p>
       )}
       {ttsError && (
-        <p className="mt-3 text-sm text-red-300/90">
-          {ttsError} — text answer is still shown below.
-        </p>
+        <div className="mt-3 rounded-lg border border-red-500/30 bg-red-950/20 p-3 text-sm text-red-200/90">
+          <p className="mb-1 font-medium text-red-200">ElevenLabs TTS error</p>
+          <pre className="whitespace-pre-wrap font-mono text-xs leading-relaxed text-red-200/80">
+            {ttsError}
+          </pre>
+          <p className="mt-2 text-xs text-red-300/70">
+            Text answer is still shown below.
+          </p>
+        </div>
       )}
 
       {(micPermissionDenied || micDeniedDespiteSitePermission) && (
