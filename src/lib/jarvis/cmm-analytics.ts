@@ -1,15 +1,38 @@
 import type {
   CmmAreaAnalytics,
   CmmLeadIntelligence,
+  CmmLeadMatch,
   CmmLeadRecord,
+  CmmMatchLedger,
+  CmmMatchStats,
   JobRecord,
   PostcodeArea,
 } from "./types";
 import type { JarvisSettings } from "./settings-store";
 import { getCmmLeadLedger, getCmmSyncMeta } from "./cmm-lead-store";
+import {
+  getCmmMatchLedger,
+  saveCmmMatchLedger,
+} from "./cmm-match-store";
+import {
+  getJobForMatch,
+  isMatchUsableForRoi,
+  runCmmLeadMatching,
+} from "./cmm-match";
+import { getJobsForCmmMatching } from "./jarvis-jobs";
 import { parseEmailDate } from "./extractors";
 
 const ALL_AREAS: PostcodeArea[] = ["GU", "RH", "TN", "SM", "CR", "Other", "Unknown"];
+
+const EMPTY_MATCH_STATS: CmmMatchStats = {
+  leadsMatchedConfidently: 0,
+  possibleMatchesNeedingReview: 0,
+  unmatchedLeads: 0,
+  unmatchedDepositJobs: 0,
+  totalLeads: 0,
+  totalJobs: 0,
+  lastMatchedAt: null,
+};
 
 function startOfWeek(d: Date): Date {
   const copy = new Date(d);
@@ -49,56 +72,6 @@ function inLastDays(lead: CmmLeadRecord, days: number, now: Date): boolean {
   return d.getTime() >= cutoff;
 }
 
-function normalizePostcode(pc: string | null): string {
-  return (pc ?? "").replace(/\s+/g, "").toUpperCase();
-}
-
-function matchLeadToJob(lead: CmmLeadRecord, jobs: JobRecord[]): JobRecord | null {
-  if (lead.customer_email) {
-    const email = lead.customer_email.toLowerCase();
-    const byEmail = jobs.find(
-      (j) => j.customer_email?.toLowerCase() === email
-    );
-    if (byEmail) return byEmail;
-  }
-
-  if (lead.customer_name && lead.collection_postcode) {
-    const name = lead.customer_name.toLowerCase();
-    const pc = normalizePostcode(lead.collection_postcode);
-    const byNamePc = jobs.find(
-      (j) =>
-        j.customer_name?.toLowerCase() === name &&
-        normalizePostcode(j.moving_from_postcode) === pc
-    );
-    if (byNamePc) return byNamePc;
-  }
-
-  if (lead.customer_name && lead.move_date) {
-    const name = lead.customer_name.toLowerCase();
-    const moveKey = lead.move_date.slice(0, 10);
-    const byNameDate = jobs.find(
-      (j) =>
-        j.customer_name?.toLowerCase() === name &&
-        j.move_date &&
-        j.move_date.includes(moveKey)
-    );
-    if (byNameDate) return byNameDate;
-  }
-
-  if (lead.customer_name && lead.collection_postcode_area !== "Unknown") {
-    const name = lead.customer_name.toLowerCase();
-    const area = lead.collection_postcode_area;
-    const byNameArea = jobs.filter(
-      (j) =>
-        j.customer_name?.toLowerCase() === name &&
-        j.moving_from_postcode_area === area
-    );
-    if (byNameArea.length === 1) return byNameArea[0];
-  }
-
-  return null;
-}
-
 function buildTimeSeries(
   leads: CmmLeadRecord[],
   cost: number,
@@ -132,9 +105,30 @@ function buildTimeSeries(
   };
 }
 
+function collectMatchedJobsForArea(
+  areaLeads: CmmLeadRecord[],
+  matches: Record<string, CmmLeadMatch>,
+  jobs: JobRecord[]
+): JobRecord[] {
+  const seen = new Set<string>();
+  const matched: JobRecord[] = [];
+
+  for (const lead of areaLeads) {
+    const match = matches[lead.gmail_message_id];
+    if (!isMatchUsableForRoi(match)) continue;
+    const job = getJobForMatch(match, jobs);
+    if (!job || seen.has(job.job_key)) continue;
+    seen.add(job.job_key);
+    matched.push(job);
+  }
+
+  return matched;
+}
+
 function buildAreaAnalytics(
   areaLeads: CmmLeadRecord[],
-  matchedJobs: JobRecord[],
+  matches: Record<string, CmmLeadMatch>,
+  jobs: JobRecord[],
   cost: number,
   now: Date
 ): CmmAreaAnalytics {
@@ -146,6 +140,7 @@ function buildAreaAnalytics(
   const thisMonth = countIn((l) => inThisMonth(l, now));
   const allTime = areaLeads.length;
 
+  const matchedJobs = collectMatchedJobsForArea(areaLeads, matches, jobs);
   const depositsPaid = matchedJobs.filter((j) => j.deposit_receipt_received_at).length;
   const turnover = matchedJobs
     .filter((j) => j.deposit_receipt_received_at)
@@ -154,11 +149,8 @@ function buildAreaAnalytics(
     .filter((j) => j.commission_payable)
     .reduce((s, j) => s + (j.commission_value ?? 0), 0);
 
-  const reliableMatches = matchedJobs.length;
   const conversionRate =
-    reliableMatches > 0 && allTime > 0 && reliableMatches >= allTime * 0.3
-      ? depositsPaid / allTime
-      : null;
+    allTime > 0 && depositsPaid > 0 ? depositsPaid / allTime : null;
 
   const spendAll = allTime * cost;
   const roi =
@@ -166,9 +158,14 @@ function buildAreaAnalytics(
       ? (turnover - spendAll) / spendAll
       : null;
 
+  const needsReviewLeads = areaLeads.filter((l) => {
+    const m = matches[l.gmail_message_id];
+    return m?.match_status === "needs_review";
+  }).length;
+
   const needsReview =
     areaLeads.some((l) => l.collection_postcode_area === "Unknown") ||
-    (allTime > 0 && reliableMatches < allTime * 0.2);
+    needsReviewLeads > 0;
 
   return {
     today: { leads: today, spend: today * cost },
@@ -180,20 +177,31 @@ function buildAreaAnalytics(
     turnover,
     commission,
     roi,
-    costPerPaidDeposit:
-      depositsPaid > 0 ? spendAll / depositsPaid : null,
+    costPerPaidDeposit: depositsPaid > 0 ? spendAll / depositsPaid : null,
     needsReview,
   };
+}
+
+export async function rematchCmmLeads(
+  leads: CmmLeadRecord[],
+  jobs: JobRecord[]
+): Promise<CmmMatchLedger> {
+  const prior = await getCmmMatchLedger();
+  const ledger = runCmmLeadMatching(leads, jobs, prior);
+  await saveCmmMatchLedger(ledger);
+  return ledger;
 }
 
 export function buildCmmLeadIntelligenceFromLeads(
   leads: CmmLeadRecord[],
   jobs: JobRecord[],
   settings: JarvisSettings,
-  syncMeta: CmmLeadIntelligence["syncMeta"] | null
+  syncMeta: CmmLeadIntelligence["syncMeta"] | null,
+  matchLedger: CmmMatchLedger | null
 ): CmmLeadIntelligence {
   const cost = settings.costPerLead;
   const now = new Date();
+  const matches = matchLedger?.matches ?? {};
 
   const leadsToday = leads.filter((l) => inToday(l, now)).length;
   const leadsThisWeek = leads.filter((l) => inThisWeek(l, now)).length;
@@ -208,12 +216,10 @@ export function buildCmmLeadIntelligenceFromLeads(
   const byArea = Object.fromEntries(
     ALL_AREAS.map((area) => {
       const areaLeads = leads.filter((l) => l.collection_postcode_area === area);
-      const matchedJobs: JobRecord[] = [];
-      for (const lead of areaLeads) {
-        const job = matchLeadToJob(lead, jobs);
-        if (job) matchedJobs.push(job);
-      }
-      return [area, buildAreaAnalytics(areaLeads, matchedJobs, cost, now)];
+      return [
+        area,
+        buildAreaAnalytics(areaLeads, matches, jobs, cost, now),
+      ];
     })
   ) as Record<PostcodeArea, CmmAreaAnalytics>;
 
@@ -280,23 +286,40 @@ export function buildCmmLeadIntelligenceFromLeads(
     topAreas,
     unknownPostcodeLeads,
     syncMeta: syncMeta ?? defaultMeta,
+    matchStats: matchLedger?.stats ?? EMPTY_MATCH_STATS,
+    reviewQueue: matchLedger?.reviewQueue ?? [],
+    unmatchedDepositJobs: matchLedger?.unmatchedDepositJobs ?? [],
     needsSetup,
     setupMessage,
   };
 }
 
 export async function loadCmmLeadIntelligence(
-  jobs: JobRecord[],
-  settings: JarvisSettings
+  settings: JarvisSettings,
+  options?: { rematch?: boolean }
 ): Promise<CmmLeadIntelligence> {
   const ledger = await getCmmLeadLedger();
   const syncMeta = await getCmmSyncMeta();
   const leads = ledger?.leads ?? [];
+  const jobs = await getJobsForCmmMatching();
+
+  let matchLedger = await getCmmMatchLedger();
+  const shouldRematch =
+    options?.rematch ||
+    !matchLedger ||
+    matchLedger.stats.totalLeads !== leads.length ||
+    matchLedger.stats.totalJobs !== jobs.length;
+
+  if (shouldRematch && leads.length > 0) {
+    matchLedger = await rematchCmmLeads(leads, jobs);
+  }
+
   return buildCmmLeadIntelligenceFromLeads(
     leads,
     jobs,
     settings,
-    syncMeta
+    syncMeta,
+    matchLedger
   );
 }
 

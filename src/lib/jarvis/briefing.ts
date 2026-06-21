@@ -208,7 +208,7 @@ export async function generateJarvisBriefing(): Promise<JarvisBriefing> {
   const moveTracker = buildMoveTrackerFromLedger(jobs, commissionRate);
   const commissionForecast = buildCommissionForecastFromLedger(jobs, commissionRate);
   const postcodeAnalytics = buildPostcodeAnalytics(jobs, settings, 30);
-  const cmmLeadIntelligence = await loadCmmLeadIntelligence(jobs, settings);
+  const cmmLeadIntelligence = await loadCmmLeadIntelligence(settings);
   const cmmSpend = cmmSpendFromIntelligence(cmmLeadIntelligence);
   const gmailConnected =
     (gmailStatus.main.connected ? 1 : 0) + (gmailStatus.appointments.connected ? 1 : 0);

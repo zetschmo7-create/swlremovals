@@ -89,6 +89,78 @@ export type CmmAreaAnalytics = {
   needsReview: boolean;
 };
 
+export type CmmBookedStatus =
+  | "unmatched"
+  | "lead_only"
+  | "survey_booked"
+  | "quote_sent"
+  | "quote_accepted"
+  | "deposit_paid";
+
+export type CmmLeadMatchStatus =
+  | "confident"
+  | "needs_review"
+  | "approved"
+  | "rejected"
+  | "unmatched";
+
+export type CmmLeadMatch = {
+  lead_id: string;
+  cmm_internal_id: string | null;
+  matched_job_id: string | null;
+  matched_quote_id: string | null;
+  matched_deposit_message_id: string | null;
+  match_confidence: number;
+  match_reason: string | null;
+  match_status: CmmLeadMatchStatus;
+  quote_value: number | null;
+  deposit_paid_at: string | null;
+  booked_status: CmmBookedStatus;
+  candidate_job_id: string | null;
+  candidate_job_name: string | null;
+  candidate_confidence: number | null;
+  updated_at: string;
+};
+
+export type CmmMatchReviewItem = {
+  lead_id: string;
+  lead_name: string | null;
+  lead_email: string | null;
+  lead_postcode: string | null;
+  lead_received_at: string;
+  candidate_job_id: string;
+  candidate_job_name: string | null;
+  candidate_job_reference: string | null;
+  candidate_deposit_at: string | null;
+  confidence: number;
+  match_reason: string;
+  ambiguous: boolean;
+};
+
+export type CmmMatchStats = {
+  leadsMatchedConfidently: number;
+  possibleMatchesNeedingReview: number;
+  unmatchedLeads: number;
+  unmatchedDepositJobs: number;
+  totalLeads: number;
+  totalJobs: number;
+  lastMatchedAt: string | null;
+};
+
+export type CmmUnmatchedDepositJob = {
+  job_key: string;
+  customer_name: string | null;
+  deposit_paid_at: string | null;
+};
+
+export type CmmMatchLedger = {
+  matches: Record<string, CmmLeadMatch>;
+  reviewQueue: CmmMatchReviewItem[];
+  unmatchedDepositJobs: CmmUnmatchedDepositJob[];
+  stats: CmmMatchStats;
+  lastMatchedAt: string | null;
+};
+
 export type CmmLeadIntelligence = {
   leadsToday: number;
   leadsThisWeek: number;
@@ -112,6 +184,9 @@ export type CmmLeadIntelligence = {
     reason: string | null;
   }>;
   syncMeta: CmmSyncMeta;
+  matchStats: CmmMatchStats;
+  reviewQueue: CmmMatchReviewItem[];
+  unmatchedDepositJobs: CmmUnmatchedDepositJob[];
   needsSetup: boolean;
   setupMessage: string | null;
 };

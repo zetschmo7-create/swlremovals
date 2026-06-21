@@ -24,7 +24,7 @@ export function CmmLeadIntelligencePanel({
 }) {
   const intel = briefing.cmmLeadIntelligence;
   const [chartMode, setChartMode] = useState<ChartMode>("daily");
-  const [busy, setBusy] = useState<"rebuild" | "sync" | null>(null);
+  const [busy, setBusy] = useState<"rebuild" | "sync" | "rematch" | "review" | null>(null);
   const [localIntel, setLocalIntel] = useState<CmmLeadIntelligence | null>(null);
   const data = localIntel ?? intel;
 
@@ -51,6 +51,63 @@ export function CmmLeadIntelligencePanel({
     },
     [onRefresh]
   );
+
+  const runRematch = useCallback(async () => {
+    setBusy("rematch");
+    try {
+      const res = await fetch("/api/jarvis/cmm-matches", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "rematch" }),
+      });
+      if (res.ok) {
+        const json = (await res.json()) as { intelligence: CmmLeadIntelligence };
+        setLocalIntel(json.intelligence);
+        onRefresh?.();
+      } else {
+        const json = (await res.json()) as { error?: string };
+        alert(json.error ?? "CMM rematch failed");
+      }
+    } finally {
+      setBusy(null);
+    }
+  }, [onRefresh]);
+
+  const runReview = useCallback(
+    async (leadId: string, decision: "approve" | "reject") => {
+      setBusy("review");
+      try {
+        const res = await fetch("/api/jarvis/cmm-matches", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: decision, leadId }),
+        });
+        if (res.ok) {
+          const json = (await res.json()) as { intelligence: CmmLeadIntelligence };
+          setLocalIntel(json.intelligence);
+          onRefresh?.();
+        } else {
+          const json = (await res.json()) as { error?: string };
+          alert(json.error ?? "Review action failed");
+        }
+      } finally {
+        setBusy(null);
+      }
+    },
+    [onRefresh]
+  );
+
+  const matchStats = data.matchStats ?? {
+    leadsMatchedConfidently: 0,
+    possibleMatchesNeedingReview: 0,
+    unmatchedLeads: 0,
+    unmatchedDepositJobs: 0,
+    totalLeads: 0,
+    totalJobs: 0,
+    lastMatchedAt: null,
+  };
+  const reviewQueue = data.reviewQueue ?? [];
+  const unmatchedDeposits = data.unmatchedDepositJobs ?? [];
 
   const areaLeads = AREAS.map((area) => {
     const stats = data.byArea[area];
@@ -120,6 +177,14 @@ export function CmmLeadIntelligencePanel({
         >
           {busy === "sync" ? "Syncing…" : "Sync New CMM Leads"}
         </button>
+        <button
+          type="button"
+          disabled={busy !== null}
+          onClick={() => void runRematch()}
+          className="rounded-lg border border-cyan-500/30 bg-cyan-950/40 px-4 py-2 text-sm text-cyan-200 hover:bg-cyan-900/40 disabled:opacity-50"
+        >
+          {busy === "rematch" ? "Matching…" : "Rematch leads → jobs"}
+        </button>
         <span className="self-center text-xs text-slate-500">Last sync: {lastSync}</span>
       </div>
 
@@ -184,6 +249,117 @@ export function CmmLeadIntelligencePanel({
         )}
       </div>
 
+      <div className="jarvis-glass mb-6 rounded-xl p-4">
+        <p className="mb-3 text-xs uppercase tracking-widest text-emerald-400/80">
+          Lead → job matching
+        </p>
+        <dl className="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
+          <StatusRow
+            label="Matched confidently"
+            value={matchStats.leadsMatchedConfidently}
+          />
+          <StatusRow
+            label="Needs review"
+            value={matchStats.possibleMatchesNeedingReview}
+          />
+          <StatusRow label="Unmatched leads" value={matchStats.unmatchedLeads} />
+          <StatusRow
+            label="Deposits not linked"
+            value={matchStats.unmatchedDepositJobs}
+          />
+          <StatusRow label="Jobs in ledger" value={matchStats.totalJobs} />
+          <StatusRow
+            label="Last matched"
+            value={
+              matchStats.lastMatchedAt
+                ? new Date(matchStats.lastMatchedAt).toLocaleString("en-GB")
+                : "Never"
+            }
+          />
+        </dl>
+        {unmatchedDeposits.length > 0 && (
+          <div className="mt-4">
+            <p className="mb-2 text-xs text-amber-300/90">
+              Deposit-paid jobs with no CMM lead match
+            </p>
+            <ul className="space-y-1 text-xs text-slate-400">
+              {unmatchedDeposits.map((j) => (
+                <li key={j.job_key}>
+                  {j.customer_name ?? "Unknown"} ·{" "}
+                  {j.deposit_paid_at
+                    ? new Date(j.deposit_paid_at).toLocaleDateString("en-GB")
+                    : "—"}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+
+      {reviewQueue.length > 0 && (
+        <div className="jarvis-glass mb-6 rounded-xl p-4">
+          <p className="mb-3 text-xs uppercase tracking-widest text-amber-400/80">
+            Match review queue ({reviewQueue.length})
+          </p>
+          <ul className="space-y-3">
+            {reviewQueue.map((item) => (
+              <li
+                key={item.lead_id}
+                className="rounded-lg border border-white/5 bg-black/20 p-3 text-sm"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="font-medium text-white">
+                      {item.lead_name ?? "Unknown lead"}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {item.lead_email ?? "No email"} · {item.lead_postcode ?? "—"} ·{" "}
+                      {new Date(item.lead_received_at).toLocaleDateString("en-GB")}
+                    </p>
+                    <p className="mt-2 text-slate-300">
+                      → {item.candidate_job_name ?? "Job"}{" "}
+                      {item.candidate_job_reference
+                        ? `(${item.candidate_job_reference})`
+                        : ""}
+                      {item.candidate_deposit_at && (
+                        <span className="text-emerald-400">
+                          {" "}
+                          · deposit{" "}
+                          {new Date(item.candidate_deposit_at).toLocaleDateString("en-GB")}
+                        </span>
+                      )}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Confidence {Math.round(item.confidence * 100)}% ·{" "}
+                      {item.match_reason}
+                      {item.ambiguous ? " · ambiguous" : ""}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 gap-2">
+                    <button
+                      type="button"
+                      disabled={busy !== null}
+                      onClick={() => void runReview(item.lead_id, "approve")}
+                      className="rounded-lg bg-emerald-900/50 px-3 py-1.5 text-xs text-emerald-200 hover:bg-emerald-800/50 disabled:opacity-50"
+                    >
+                      Approve
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy !== null}
+                      onClick={() => void runReview(item.lead_id, "reject")}
+                      className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-400 hover:bg-white/5 disabled:opacity-50"
+                    >
+                      Reject
+                    </button>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div className="jarvis-glass mb-6 overflow-x-auto rounded-xl">
         <table className="w-full min-w-[900px] text-left text-sm">
           <thead>
@@ -217,10 +393,12 @@ export function CmmLeadIntelligencePanel({
                     {stats.depositsPaid}
                   </td>
                   <td className="p-3 text-white">
-                    {stats.needsReview ? (
+                    {stats.conversionRate != null ? (
+                      formatPct(stats.conversionRate)
+                    ) : stats.needsReview ? (
                       <span className="text-xs text-amber-300">Needs review</span>
                     ) : (
-                      formatPct(stats.conversionRate)
+                      "—"
                     )}
                   </td>
                   <td className="p-3 tabular-nums text-white">

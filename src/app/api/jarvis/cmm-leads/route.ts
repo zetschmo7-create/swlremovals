@@ -4,22 +4,6 @@ import { rebuildCmmLeadLedger, syncNewCmmLeads } from "@/lib/jarvis/cmm-ingest";
 import { CmmIngestLockedError } from "@/lib/jarvis/cmm-lead-store";
 import { loadCmmLeadIntelligence } from "@/lib/jarvis/cmm-analytics";
 import { getJarvisSettings } from "@/lib/jarvis/settings-store";
-import { fetchJarvisEmails } from "@/lib/jarvis/gmail";
-import { detectEmailEvents } from "@/lib/jarvis/email-events";
-import { buildJobLedger } from "@/lib/jarvis/job-ledger";
-import { collectPdfAudit } from "@/lib/jarvis/ledger-analytics";
-
-async function getJobsForMatching() {
-  try {
-    const emails = await fetchJarvisEmails({ days: 30, parsePdfs: false });
-    const pdfAudit = collectPdfAudit(emails);
-    const settings = await getJarvisSettings();
-    const { events, duplicateCount } = detectEmailEvents(emails);
-    return buildJobLedger(events, duplicateCount, settings, pdfAudit).jobs;
-  } catch {
-    return [];
-  }
-}
 
 export async function GET() {
   const authed = await getJarvisSession();
@@ -29,8 +13,7 @@ export async function GET() {
 
   try {
     const settings = await getJarvisSettings();
-    const jobs = await getJobsForMatching();
-    const intelligence = await loadCmmLeadIntelligence(jobs, settings);
+    const intelligence = await loadCmmLeadIntelligence(settings);
     return NextResponse.json(intelligence);
   } catch (error) {
     const message = error instanceof Error ? error.message : "CMM analytics failed";
@@ -59,8 +42,7 @@ export async function POST(request: Request) {
         : await syncNewCmmLeads();
 
     const settings = await getJarvisSettings();
-    const jobs = await getJobsForMatching();
-    const intelligence = await loadCmmLeadIntelligence(jobs, settings);
+    const intelligence = await loadCmmLeadIntelligence(settings, { rematch: true });
 
     return NextResponse.json({ ingest: result, intelligence });
   } catch (error) {

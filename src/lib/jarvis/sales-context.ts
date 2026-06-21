@@ -6,6 +6,8 @@ import type {
   SalesContext,
 } from "./types";
 import { getCmmLeadLedger } from "./cmm-lead-store";
+import { getCmmMatchLedger } from "./cmm-match-store";
+import { getJobForMatch } from "./cmm-match";
 import { JARVIS_CONFIG } from "./config";
 
 function stageLabel(job: JobRecord | null, lead: CmmLeadRecord | null): string {
@@ -119,26 +121,12 @@ function buildFromLead(
 
 function matchLeadToJob(
   lead: CmmLeadRecord,
-  jobs: JobRecord[]
+  jobs: JobRecord[],
+  matchLedger: Awaited<ReturnType<typeof getCmmMatchLedger>>
 ): JobRecord | null {
-  if (lead.customer_email) {
-    const email = lead.customer_email.toLowerCase();
-    const byEmail = jobs.find(
-      (j) => j.customer_email?.toLowerCase() === email
-    );
-    if (byEmail) return byEmail;
-  }
-  if (lead.customer_name && lead.collection_postcode) {
-    const name = lead.customer_name.toLowerCase();
-    const pc = lead.collection_postcode.replace(/\s+/g, "").toUpperCase();
-    const byNamePc = jobs.find(
-      (j) =>
-        j.customer_name?.toLowerCase() === name &&
-        (j.moving_from_postcode ?? "")
-          .replace(/\s+/g, "")
-          .toUpperCase() === pc
-    );
-    if (byNamePc) return byNamePc;
+  const match = matchLedger?.matches[lead.gmail_message_id];
+  if (match?.matched_job_id) {
+    return getJobForMatch(match, jobs);
   }
   return null;
 }
@@ -161,6 +149,7 @@ export async function resolveSalesContext(
 
   if (options.leadId) {
     const ledger = await getCmmLeadLedger();
+    const matchLedger = await getCmmMatchLedger();
     const lead = ledger?.leads.find(
       (l) => l.lead_id === options.leadId || l.gmail_message_id === options.leadId
     );
@@ -168,7 +157,7 @@ export async function resolveSalesContext(
       warnings.push("Selected CMM lead not found in lead ledger.");
       return { context: emptyContext(), warnings };
     }
-    const matched = matchLeadToJob(lead, jobs);
+    const matched = matchLeadToJob(lead, jobs, matchLedger);
     if (lead.collection_postcode_area === "Unknown") {
       warnings.push("Collection postcode is unknown — do not invent location details.");
     }
