@@ -145,7 +145,16 @@ function collectImveMatchedJobsForArea(
     if (!isImveMatchUsableForRoi(match) || !match?.imve_job_id) continue;
     const imveJob = jobById.get(match.imve_job_id);
     if (!imveJob) continue;
+
+    const hasDeposit = match.deposit_paid || imveJob.deposit_paid;
+    const hasValue = (imveJob.turnover ?? imveJob.quote_value) != null;
+    if (!hasDeposit && !hasValue) continue;
+
     const job = imveJobToJobRecord(imveJob);
+    if (match.deposit_paid && !job.deposit_receipt_received_at) {
+      job.deposit_receipt_received_at =
+        match.deposit_paid_at ?? imveJob.deposit_paid_at ?? job.deposit_receipt_received_at;
+    }
     if (seen.has(job.job_key)) continue;
     seen.add(job.job_key);
     matched.push(job);
@@ -177,9 +186,13 @@ function buildAreaAnalytics(
       ? collectImveMatchedJobsForArea(areaLeads, imveMatches, imveJobs)
       : collectMatchedJobsForArea(areaLeads, matches, jobs);
 
-  const depositsPaid = matchedJobs.filter(
-    (j) => j.deposit_receipt_received_at
-  ).length;
+  const depositsPaid =
+    useImveRoi && imveMatches
+      ? areaLeads.filter((l) => {
+          const m = imveMatches[l.gmail_message_id];
+          return isImveMatchUsableForRoi(m) && m?.deposit_paid;
+        }).length
+      : matchedJobs.filter((j) => j.deposit_receipt_received_at).length;
   const turnover = matchedJobs
     .filter((j) => j.deposit_receipt_received_at)
     .reduce((s, j) => s + (j.final_move_value ?? j.quote_value ?? 0), 0);

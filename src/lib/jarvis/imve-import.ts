@@ -1,10 +1,9 @@
 import { randomUUID } from "crypto";
 import type { JarvisSettings } from "./settings-store";
 import {
-  applyInvoicesToJobs,
-  mergeImveInvoices,
-  mergeImveJobs,
+  applyInvoicesToJobsWithLinking,
   normalizeImveFile,
+  renormalizeLedgerFromRaw,
 } from "./imve-normalize";
 import { maskRowsForPreview } from "./imve-mask";
 import {
@@ -13,6 +12,7 @@ import {
   parseSpreadsheetBuffer,
 } from "./imve-parse";
 import type {
+  ImveCmmMatchLedger,
   ImveFilePreview,
   ImveImportLedger,
   ImveImportPreviewSession,
@@ -27,11 +27,38 @@ import { assessImportPreview } from "./imve-validate";
 import { runImveCmmMatching } from "./imve-cmm-match";
 import { getImveCmmMatchLedger, saveImveCmmMatchLedger } from "./imve-cmm-match-store";
 import { getCmmLeadLedger } from "./cmm-lead-store";
+import { buildPreviewMappingDebug } from "./imve-file-debug";
 
 export type ImveUploadedFile = {
   filename: string;
   buffer: Buffer;
 };
+
+function applyRenormalizedLedger(
+  ledger: ImveImportLedger,
+  commissionRate: number
+): ImveImportLedger {
+  const { jobs, invoices } = renormalizeLedgerFromRaw(
+    ledger.raw_files,
+    commissionRate
+  );
+  const {
+    jobs: jobsWithInvoices,
+    linkedDepositCount,
+    unlinkedDepositCount,
+    linkReasons,
+  } = applyInvoicesToJobsWithLinking(jobs, invoices, commissionRate);
+
+  return {
+    ...ledger,
+    jobs: jobsWithInvoices,
+    invoices,
+    linked_deposit_count: linkedDepositCount,
+    unlinked_deposit_count: unlinkedDepositCount,
+    link_reasons: linkReasons,
+    roi_active: jobsWithInvoices.length > 0,
+  };
+}
 
 export function buildFilePreview(
   file: ImveUploadedFile,
@@ -90,6 +117,18 @@ export async function createImveImportPreview(
     session_id: randomUUID(),
     created_at: new Date().toISOString(),
     files: filePreviews,
+    mapping_debug: buildPreviewMappingDebug(
+      previews.map((p) => ({
+        filename: p.filename,
+        file_type: p.file_type,
+        columns: p.columns,
+        row_count: p.row_count,
+        normalized_job_count: p.normalized_job_count,
+        normalized_invoice_count: p.normalized_invoice_count,
+        column_mapping: p.parsed.column_mapping,
+        rows: p.parsed.raw.rows,
+      }))
+    ),
     parsed,
     summary: {
       normalized_jobs: 0,
@@ -118,6 +157,7 @@ export async function confirmImveImport(
 
   const ledger = await getImveImportLedgerOrEmpty();
   const importedHashes = new Set(ledger.imported_file_hashes);
+  const commissionRate = settings.commissionPercent / 100;
 
   const previewSummary = assessImportPreview(session, ledger);
   if (!previewSummary.can_confirm) {
@@ -128,53 +168,40 @@ export async function confirmImveImport(
   }
 
   const hasNewFiles = session.files.some((f) => !f.already_imported);
-  const hasNewNormalized =
-    session.parsed.jobs.some((j) => !importedHashes.has(j.source_file_hash)) ||
-    session.parsed.invoices.some((i) => !importedHashes.has(i.source_file_hash));
 
   const newRawFiles = session.parsed.raw_files.filter(
     (f) => !importedHashes.has(f.file_hash)
   );
-  const newJobs = session.parsed.jobs.filter(
-    (j) => !importedHashes.has(j.source_file_hash)
-  );
-  const newInvoices = session.parsed.invoices.filter(
-    (i) => !importedHashes.has(i.source_file_hash)
-  );
-
-  const mergedJobs = mergeImveJobs(ledger.jobs, newJobs);
-  const mergedInvoices = mergeImveInvoices(ledger.invoices, newInvoices);
-  const jobsWithInvoices = applyInvoicesToJobs(
-    mergedJobs,
-    mergedInvoices,
-    settings.commissionPercent / 100
-  );
-
   const newHashes = newRawFiles.map((f) => f.file_hash);
-  const roi_active =
-    jobsWithInvoices.length > 0 &&
-    (hasNewNormalized || ledger.roi_active || !hasNewFiles);
 
-  const updated: ImveImportLedger = {
+  const rawFiles = [
+    ...ledger.raw_files.filter((f) => !newHashes.includes(f.file_hash)),
+    ...newRawFiles,
+  ];
+
+  let updated: ImveImportLedger = {
     version: 1,
-    jobs: jobsWithInvoices,
-    invoices: mergedInvoices,
-    raw_files: [
-      ...ledger.raw_files.filter((f) => !newHashes.includes(f.file_hash)),
-      ...newRawFiles,
-    ],
+    jobs: ledger.jobs,
+    invoices: ledger.invoices,
+    raw_files: rawFiles,
     imported_file_hashes: [
       ...new Set([...ledger.imported_file_hashes, ...newHashes]),
     ],
     last_import_at:
       newHashes.length > 0 ? new Date().toISOString() : ledger.last_import_at,
-    roi_active: roi_active && jobsWithInvoices.length > 0,
+    roi_active: ledger.roi_active,
   };
+
+  updated = applyRenormalizedLedger(updated, commissionRate);
 
   if (!updated.roi_active) {
     throw new Error(
       "Import produced no usable i-MVE jobs. ROI was not updated. Check file types and column headers."
     );
+  }
+
+  if (!hasNewFiles && newHashes.length === 0) {
+    throw new Error("No new files to import.");
   }
 
   await saveImveImportLedger(updated);
@@ -185,4 +212,21 @@ export async function confirmImveImport(
   await saveImveCmmMatchLedger(matchLedger);
 
   return updated;
+}
+
+export async function rematchImveImport(
+  settings: JarvisSettings
+): Promise<{ ledger: ImveImportLedger; matchLedger: ImveCmmMatchLedger }> {
+  const ledger = await getImveImportLedgerOrEmpty();
+  const commissionRate = settings.commissionPercent / 100;
+
+  const updated = applyRenormalizedLedger(ledger, commissionRate);
+  await saveImveImportLedger(updated);
+
+  const cmmLeads = (await getCmmLeadLedger())?.leads ?? [];
+  const priorMatches = await getImveCmmMatchLedger();
+  const matchLedger = runImveCmmMatching(cmmLeads, updated.jobs, priorMatches);
+  await saveImveCmmMatchLedger(matchLedger);
+
+  return { ledger: updated, matchLedger };
 }

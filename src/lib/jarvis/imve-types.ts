@@ -1,3 +1,4 @@
+import type { ImveMappedField } from "./imve-column-map";
 import type { PostcodeArea } from "./types";
 
 export type ImveFileType =
@@ -15,6 +16,7 @@ export type ImveRawFileAudit = {
   row_count: number;
   columns: string[];
   rows: Record<string, string>[];
+  column_mapping?: Record<ImveMappedField, string | null>;
 };
 
 export type ImveJobRecord = {
@@ -44,12 +46,15 @@ export type ImveInvoiceRecord = {
   invoice_id: string;
   job_reference: string | null;
   customer_name: string | null;
+  customer_email: string | null;
+  customer_phone: string | null;
   invoice_date: string | null;
   amount: number | null;
   paid: boolean;
   paid_at: string | null;
   invoice_type: "job" | "deposit" | "custom";
   source_file_hash: string;
+  link_reason?: string | null;
   raw: Record<string, string>;
 };
 
@@ -62,6 +67,9 @@ export type ImveImportLedger = {
   last_import_at: string | null;
   /** Set true only after a confirmed import with normalized jobs/invoices. */
   roi_active: boolean;
+  linked_deposit_count?: number;
+  unlinked_deposit_count?: number;
+  link_reasons?: Record<string, number>;
 };
 
 export type ImveFilePreview = {
@@ -75,6 +83,22 @@ export type ImveFilePreview = {
   sample_rows: Record<string, string>[];
   already_imported: boolean;
   parse_warnings: string[];
+};
+
+export type ImveFileMappingDebug = {
+  filename: string;
+  headers: string[];
+  file_type: ImveFileType;
+  raw_row_count: number;
+  normalized_job_count: number;
+  normalized_invoice_count: number;
+  usable_row_count: number;
+  /** Debug label → actual CSV header name */
+  field_mapping: Record<string, string | null>;
+  mapping_scores: Record<string, { column: string | null; score: number }>;
+  unmapped_headers: string[];
+  missing_required_fields: string[];
+  first_row_mapped: Record<string, string>;
 };
 
 export type ImveImportPreviewSummary = {
@@ -92,6 +116,7 @@ export type ImveImportPreviewSession = {
   created_at: string;
   files: ImveFilePreview[];
   summary: ImveImportPreviewSummary;
+  mapping_debug: ImveFileMappingDebug[];
   parsed: {
     jobs: ImveJobRecord[];
     invoices: ImveInvoiceRecord[];
@@ -165,4 +190,55 @@ export type ImveImportSummary = {
   importedFiles: number;
   matchStats: ImveCmmMatchStats;
   reviewQueue: ImveCmmMatchReviewItem[];
+};
+
+export type ImveImportDebugSampleCandidate = {
+  imve_job_id: string;
+  job_reference: string | null;
+  customer_name: string | null;
+  confidence: number;
+  reasons: string[];
+};
+
+export type ImveImportDebugSampleMatch = {
+  lead_id: string;
+  lead_name: string | null;
+  lead_email: string | null;
+  lead_received_at: string;
+  candidates: ImveImportDebugSampleCandidate[];
+  match_status: ImveCmmMatchStatus;
+  explanation: string | null;
+};
+
+export type ImveImportDebug = {
+  import_counts: {
+    files_uploaded: number;
+    by_type: Partial<Record<ImveFileType, number>>;
+    raw_rows_per_file: Array<{
+      filename: string;
+      file_type: ImveFileType;
+      row_count: number;
+    }>;
+    normalized_jobs: number;
+    normalized_deposits: number;
+    normalized_job_invoices: number;
+    normalized_custom_invoices: number;
+  };
+  field_mapping: Record<string, string>;
+  matching_counts: {
+    total_cmm_leads: number;
+    total_imve_jobs: number;
+    deposits: number;
+    auto_matched: number;
+    needs_review: number;
+    unmatched: number;
+    deposits_linked: number;
+    deposits_unlinked: number;
+    jobs_with_value: number;
+    jobs_missing_value: number;
+  };
+  sample_matches: ImveImportDebugSampleMatch[];
+  warnings: string[];
+  /** Per-file header → field mapping from stored raw exports */
+  file_mapping_debug: ImveFileMappingDebug[];
 };

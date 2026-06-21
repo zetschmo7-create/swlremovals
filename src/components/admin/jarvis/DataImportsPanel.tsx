@@ -8,7 +8,9 @@ import type {
 } from "@/lib/jarvis/types";
 import type {
   ImveCmmMatchLedger,
+  ImveFileMappingDebug,
   ImveFilePreview,
+  ImveImportDebug,
   ImveImportPreviewSession,
 } from "@/lib/jarvis/imve-types";
 import { Section } from "./jarvis-ui";
@@ -39,16 +41,7 @@ export function DataImportsPanel({
   const [matchLedger, setMatchLedger] = useState<ImveCmmMatchLedger | null>(
     null
   );
-  const [matchSamples, setMatchSamples] = useState<
-    Array<{
-      lead_id: string;
-      job_reference: string | null;
-      confidence: number;
-      reason: string | null;
-      status: string;
-      deposit_paid: boolean;
-    }>
-  >([]);
+  const [debug, setDebug] = useState<ImveImportDebug | null>(null);
 
   const intel = localIntel ?? briefing.cmmLeadIntelligence;
   const imveSummary = intel.imveImportSummary;
@@ -60,11 +53,11 @@ export function DataImportsPanel({
         (
           json: {
             matchLedger?: ImveCmmMatchLedger;
-            matchSamples?: typeof matchSamples;
+            debug?: ImveImportDebug;
           } | null
         ) => {
           if (json?.matchLedger) setMatchLedger(json.matchLedger);
-          if (json?.matchSamples) setMatchSamples(json.matchSamples);
+          if (json?.debug) setDebug(json.debug);
         }
       )
       .catch(() => {});
@@ -120,11 +113,13 @@ export function DataImportsPanel({
       const json = (await res.json()) as {
         intelligence?: CmmLeadIntelligence;
         matchLedger?: ImveCmmMatchLedger;
+        debug?: ImveImportDebug;
         error?: string;
       };
       if (!res.ok) throw new Error(json.error ?? "Import failed");
       setLocalIntel(json.intelligence ?? null);
       setMatchLedger(json.matchLedger ?? null);
+      if (json.debug) setDebug(json.debug);
       setPreview(null);
       setSelectedFiles([]);
       onRefresh?.();
@@ -147,11 +142,13 @@ export function DataImportsPanel({
       const json = (await res.json()) as {
         intelligence?: CmmLeadIntelligence;
         matchLedger?: ImveCmmMatchLedger;
+        debug?: ImveImportDebug;
         error?: string;
       };
       if (!res.ok) throw new Error(json.error ?? "Rematch failed");
       setLocalIntel(json.intelligence ?? null);
       setMatchLedger(json.matchLedger ?? null);
+      if (json.debug) setDebug(json.debug);
       onRefresh?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Rematch failed");
@@ -173,11 +170,13 @@ export function DataImportsPanel({
         const json = (await res.json()) as {
           intelligence?: CmmLeadIntelligence;
           matchLedger?: ImveCmmMatchLedger;
+          debug?: ImveImportDebug;
           error?: string;
         };
         if (!res.ok) throw new Error(json.error ?? "Review failed");
         setLocalIntel(json.intelligence ?? null);
         setMatchLedger(json.matchLedger ?? null);
+        if (json.debug) setDebug(json.debug);
         onRefresh?.();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Review failed");
@@ -288,6 +287,12 @@ export function DataImportsPanel({
             {preview.files.map((file) => (
               <FilePreviewCard key={file.file_hash} file={file} />
             ))}
+            {preview.mapping_debug.length > 0 && (
+              <ImveMappingDebugSection
+                title="i-MVE import preview — column mapping"
+                files={preview.mapping_debug}
+              />
+            )}
             <div className="flex gap-3">
               <button
                 type="button"
@@ -312,25 +317,7 @@ export function DataImportsPanel({
           </div>
         )}
 
-        {matchSamples.length > 0 && (
-          <div className="mt-6">
-            <p className="mb-3 text-xs uppercase tracking-widest text-slate-500">
-              Match debug (auto-matched sample)
-            </p>
-            <ul className="space-y-1 text-xs text-slate-400">
-              {matchSamples.map((m) => (
-                <li key={m.lead_id}>
-                  <span className="text-slate-300">{m.job_reference ?? m.lead_id.slice(0, 8)}</span>
-                  {" · "}
-                  {m.confidence}% · {m.reason ?? "—"}
-                  {m.deposit_paid && (
-                    <span className="text-emerald-400"> · deposit</span>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+        {debug && <ImveImportDebugPanel debug={debug} />}
 
         {reviewQueue.length > 0 && (
           <div className="mt-6">
@@ -393,6 +380,374 @@ export function DataImportsPanel({
   );
 }
 
+function ImveMappingDebugSection({
+  title,
+  files,
+  warnings,
+  matchingCounts,
+  sampleMatches,
+}: {
+  title: string;
+  files: ImveFileMappingDebug[];
+  warnings?: string[];
+  matchingCounts?: ImveImportDebug["matching_counts"];
+  sampleMatches?: ImveImportDebug["sample_matches"];
+}) {
+  return (
+    <div className="mt-6 space-y-4">
+      <p className="text-xs uppercase tracking-widest text-cyan-400/90">{title}</p>
+
+      {warnings && warnings.length > 0 && (
+        <ul className="space-y-1 rounded-lg border border-amber-500/30 bg-amber-950/20 p-3 text-xs text-amber-200">
+          {warnings.map((w) => (
+            <li key={w}>• {w}</li>
+          ))}
+        </ul>
+      )}
+
+      {matchingCounts && (
+        <dl className="grid gap-2 text-xs sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <dt className="text-slate-500">CMM leads</dt>
+            <dd className="text-white tabular-nums">{matchingCounts.total_cmm_leads}</dd>
+          </div>
+          <div>
+            <dt className="text-slate-500">i-MVE jobs</dt>
+            <dd className="text-white tabular-nums">{matchingCounts.total_imve_jobs}</dd>
+          </div>
+          <div>
+            <dt className="text-slate-500">Auto-matched</dt>
+            <dd className="text-emerald-300 tabular-nums">{matchingCounts.auto_matched}</dd>
+          </div>
+          <div>
+            <dt className="text-slate-500">Deposits linked</dt>
+            <dd className="text-white tabular-nums">
+              {matchingCounts.deposits_linked} / {matchingCounts.deposits}
+            </dd>
+          </div>
+        </dl>
+      )}
+
+      {files.map((file) => (
+        <FileMappingDebugCard key={file.filename} file={file} />
+      ))}
+
+      {sampleMatches && sampleMatches.length > 0 && (
+        <div className="rounded-lg border border-white/10 bg-black/20 p-4">
+          <p className="mb-3 text-xs uppercase tracking-widest text-slate-500">
+            Sample CMM lead matching (newest 10)
+          </p>
+          <ul className="space-y-3 text-xs">
+            {sampleMatches.map((s) => (
+              <li key={s.lead_id} className="border-t border-white/5 pt-3 first:border-0 first:pt-0">
+                <p className="text-slate-300">
+                  {s.lead_name ?? "Unknown"} · {s.lead_email ?? "no email"} ·{" "}
+                  <span className="text-slate-500">{s.match_status}</span>
+                </p>
+                {s.explanation && (
+                  <p className="mt-1 text-amber-300/90">{s.explanation}</p>
+                )}
+                {s.candidates.length > 0 && (
+                  <ul className="mt-1 space-y-1 text-slate-500">
+                    {s.candidates.map((c) => (
+                      <li key={c.imve_job_id}>
+                        → {c.job_reference ?? c.imve_job_id} · {c.customer_name ?? "—"} ·{" "}
+                        {c.confidence}% · {c.reasons.join(", ")}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const MAPPING_FIELDS = [
+  "job_reference",
+  "customer_name",
+  "email",
+  "phone",
+  "collection_postcode",
+  "delivery_postcode",
+  "move_date",
+  "status",
+  "quote_value",
+  "deposit_amount",
+  "invoice_total",
+  "deposit_paid_date",
+] as const;
+
+function FileMappingDebugCard({ file }: { file: ImveFileMappingDebug }) {
+  const hasZeroNormalized =
+    file.normalized_job_count === 0 && file.normalized_invoice_count === 0;
+
+  return (
+    <div className="rounded-lg border border-white/10 bg-black/20 p-4 text-sm">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <p className="font-medium text-white">{file.filename}</p>
+        <span className="rounded-full border border-cyan-500/30 px-2 py-0.5 text-xs text-cyan-300">
+          {FILE_TYPE_LABELS[file.file_type] ?? file.file_type}
+        </span>
+      </div>
+
+      <dl className="mb-3 grid gap-2 text-xs sm:grid-cols-2 lg:grid-cols-4">
+        <div>
+          <dt className="text-slate-500">Raw rows</dt>
+          <dd className="text-white tabular-nums">{file.raw_row_count}</dd>
+        </div>
+        <div>
+          <dt className="text-slate-500">Normalized jobs</dt>
+          <dd className="text-white tabular-nums">{file.normalized_job_count}</dd>
+        </div>
+        <div>
+          <dt className="text-slate-500">Normalized invoices</dt>
+          <dd className="text-white tabular-nums">{file.normalized_invoice_count}</dd>
+        </div>
+        <div>
+          <dt className="text-slate-500">Usable rows</dt>
+          <dd
+            className={
+              file.usable_row_count === 0 ? "text-amber-300 tabular-nums" : "text-emerald-300 tabular-nums"
+            }
+          >
+            {file.usable_row_count}
+          </dd>
+        </div>
+      </dl>
+
+      <p className="mb-2 text-xs text-slate-400">
+        <span className="text-slate-500">Actual CSV headers: </span>
+        {file.headers.join(" · ")}
+      </p>
+
+      <div className="overflow-x-auto">
+        <table className="min-w-full text-left text-xs">
+          <thead>
+            <tr className="text-slate-500">
+              <th className="pr-4 pb-2 font-normal">Normalized field</th>
+              <th className="pr-4 pb-2 font-normal">Mapped CSV column</th>
+              <th className="pb-2 font-normal">First row value</th>
+            </tr>
+          </thead>
+          <tbody>
+            {MAPPING_FIELDS.map((field) => {
+              const column = file.field_mapping[field];
+              const value = file.first_row_mapped[field];
+              return (
+                <tr key={field} className="border-t border-white/5">
+                  <td className="py-1.5 pr-4 text-slate-400">{field}</td>
+                  <td
+                    className={`py-1.5 pr-4 ${column ? "text-cyan-200" : "text-red-300/90"}`}
+                  >
+                    {column ?? "— not mapped"}
+                  </td>
+                  <td className="py-1.5 text-slate-300">{value || "—"}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {file.unmapped_headers.length > 0 && (
+        <p className="mt-3 text-xs text-slate-500">
+          Unmapped headers: {file.unmapped_headers.join(", ")}
+        </p>
+      )}
+
+      {(hasZeroNormalized || file.usable_row_count === 0) &&
+        file.missing_required_fields.length > 0 && (
+          <div className="mt-3 rounded border border-red-500/30 bg-red-950/20 p-3 text-xs text-red-200">
+            <p className="font-medium">Missing / blocking fields:</p>
+            <ul className="mt-1 list-inside list-disc">
+              {file.missing_required_fields.map((m) => (
+                <li key={m}>{m}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+    </div>
+  );
+}
+
+function ImveImportDebugPanel({ debug }: { debug: ImveImportDebug }) {
+  const { import_counts: ic, matching_counts: mc } = debug;
+
+  return (
+    <div className="mt-6 space-y-5 rounded-lg border border-violet-500/20 bg-violet-950/10 p-4">
+      <p className="text-xs uppercase tracking-widest text-violet-300/80">
+        i-MVE Import + Matching Debug
+      </p>
+
+      {debug.warnings.length > 0 && (
+        <ul className="space-y-1 text-sm text-amber-300/90">
+          {debug.warnings.map((w) => (
+            <li key={w}>⚠ {w}</li>
+          ))}
+        </ul>
+      )}
+
+      <div>
+        <p className="mb-2 text-xs uppercase tracking-widest text-slate-500">
+          1. Import counts
+        </p>
+        <dl className="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <dt className="text-slate-500">Files</dt>
+            <dd className="text-white tabular-nums">{ic.files_uploaded}</dd>
+          </div>
+          <div>
+            <dt className="text-slate-500">Jobs</dt>
+            <dd className="text-white tabular-nums">{ic.normalized_jobs}</dd>
+          </div>
+          <div>
+            <dt className="text-slate-500">Deposits</dt>
+            <dd className="text-white tabular-nums">{ic.normalized_deposits}</dd>
+          </div>
+          <div>
+            <dt className="text-slate-500">Job / custom invoices</dt>
+            <dd className="text-white tabular-nums">
+              {ic.normalized_job_invoices} / {ic.normalized_custom_invoices}
+            </dd>
+          </div>
+        </dl>
+        {ic.raw_rows_per_file.length > 0 && (
+          <ul className="mt-2 space-y-1 text-xs text-slate-400">
+            {ic.raw_rows_per_file.map((f) => (
+              <li key={f.filename}>
+                {f.filename} ({FILE_TYPE_LABELS[f.file_type] ?? f.file_type}):{" "}
+                {f.row_count} rows
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div>
+        <p className="mb-2 text-xs uppercase tracking-widest text-slate-500">
+          2. Field mapping
+        </p>
+        {Object.keys(debug.field_mapping).length === 0 ? (
+          <p className="text-xs text-slate-500">No column mappings stored yet.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-left text-xs">
+              <thead>
+                <tr className="text-slate-500">
+                  <th className="pr-4 pb-1 font-normal">Normalized field</th>
+                  <th className="pb-1 font-normal">CSV header</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Object.entries(debug.field_mapping).map(([field, header]) => (
+                  <tr key={field} className="border-t border-white/5 text-slate-300">
+                    <td className="pr-4 py-1">{field}</td>
+                    <td className="py-1 text-cyan-300">{header}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <div>
+        <p className="mb-2 text-xs uppercase tracking-widest text-slate-500">
+          3. Matching counts
+        </p>
+        <dl className="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <dt className="text-slate-500">CMM leads</dt>
+            <dd className="text-white tabular-nums">{mc.total_cmm_leads}</dd>
+          </div>
+          <div>
+            <dt className="text-slate-500">i-MVE jobs</dt>
+            <dd className="text-white tabular-nums">{mc.total_imve_jobs}</dd>
+          </div>
+          <div>
+            <dt className="text-slate-500">Auto-matched</dt>
+            <dd className="text-emerald-300 tabular-nums">{mc.auto_matched}</dd>
+          </div>
+          <div>
+            <dt className="text-slate-500">Needs review</dt>
+            <dd className="text-amber-300 tabular-nums">{mc.needs_review}</dd>
+          </div>
+          <div>
+            <dt className="text-slate-500">Unmatched</dt>
+            <dd className="text-slate-300 tabular-nums">{mc.unmatched}</dd>
+          </div>
+          <div>
+            <dt className="text-slate-500">Deposits linked</dt>
+            <dd className="text-white tabular-nums">
+              {mc.deposits_linked} / {mc.deposits}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-slate-500">Jobs with value</dt>
+            <dd className="text-white tabular-nums">{mc.jobs_with_value}</dd>
+          </div>
+          <div>
+            <dt className="text-slate-500">Jobs missing value</dt>
+            <dd className="text-slate-400 tabular-nums">{mc.jobs_missing_value}</dd>
+          </div>
+        </dl>
+      </div>
+
+      <div>
+        <p className="mb-2 text-xs uppercase tracking-widest text-slate-500">
+          4. Sample match debugging (10 newest leads)
+        </p>
+        <ul className="space-y-3">
+          {debug.sample_matches.map((sample) => (
+            <li
+              key={sample.lead_id}
+              className="rounded-lg border border-white/5 bg-black/20 p-3 text-xs"
+            >
+              <p className="font-medium text-white">
+                {sample.lead_name ?? "Unknown"}{" "}
+                <span className="text-slate-500">
+                  ({sample.lead_email ?? "no email"})
+                </span>
+              </p>
+              <p className="mt-1 text-slate-500">
+                Status: {sample.match_status} · {sample.explanation}
+              </p>
+              {sample.candidates.length > 0 && (
+                <ul className="mt-2 space-y-1 text-slate-400">
+                  {sample.candidates.map((c, i) => (
+                    <li key={c.imve_job_id}>
+                      #{i + 1}{" "}
+                      {c.job_reference ?? c.imve_job_id} — {c.customer_name ?? "?"}{" "}
+                      · {c.confidence}% · {c.reasons.join(", ") || "—"}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      {debug.file_mapping_debug.length > 0 && (
+        <div>
+          <p className="mb-2 text-xs uppercase tracking-widest text-slate-500">
+            5. Per-file headers &amp; column mapping
+          </p>
+          <div className="space-y-4">
+            {debug.file_mapping_debug.map((file) => (
+              <FileMappingDebugCard key={file.filename} file={file} />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function FilePreviewCard({ file }: { file: ImveFilePreview }) {
   return (
     <div className="rounded-lg border border-white/10 bg-black/20 p-4">
@@ -410,8 +765,7 @@ function FilePreviewCard({ file }: { file: ImveFilePreview }) {
         <div>
           <dt className="text-slate-500">Normalized</dt>
           <dd className="text-white tabular-nums">
-            {file.normalized_job_count} jobs / {file.normalized_invoice_count}{" "}
-            inv
+            {file.normalized_job_count} jobs / {file.normalized_invoice_count} inv
           </dd>
         </div>
         <div>
@@ -428,8 +782,7 @@ function FilePreviewCard({ file }: { file: ImveFilePreview }) {
         )}
       </dl>
       <p className="mt-2 text-xs text-slate-500">
-        Columns: {file.columns.slice(0, 12).join(", ")}
-        {file.columns.length > 12 ? ` (+${file.columns.length - 12} more)` : ""}
+        Columns: {file.columns.join(", ")}
       </p>
       {file.parse_warnings.length > 0 && (
         <p className="mt-2 text-xs text-amber-300/90">

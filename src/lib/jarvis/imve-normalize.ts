@@ -1,8 +1,12 @@
-import { extractJobReference, extractPostcodeArea } from "./extractors";
+import { extractPostcodeArea } from "./extractors";
+import { normalizePhone } from "./cmm-match-scoring";
 import {
-  IMVE_FIELD_ALIASES,
-  pickField,
-} from "./imve-parse";
+  extractJobReferenceFromRow,
+  pickMappedField,
+  resolveColumnMapping,
+  type ImveMappedField,
+} from "./imve-column-map";
+import { applyInvoicesToJobsWithLinking } from "./imve-invoice-link";
 import type {
   ImveFileType,
   ImveInvoiceRecord,
@@ -27,7 +31,8 @@ function parseBool(value: string | null): boolean {
     v === "1" ||
     v === "paid" ||
     v === "complete" ||
-    v === "completed"
+    v === "completed" ||
+    v === "received"
   );
 }
 
@@ -38,55 +43,72 @@ function parseDate(value: string | null): string | null {
   return d.toISOString();
 }
 
-function jobIdFromRow(row: Record<string, string>, index: number): string {
-  const ref = pickField(row, [...IMVE_FIELD_ALIASES.jobReference]);
-  const id = pickField(row, [...IMVE_FIELD_ALIASES.imveId]);
+function jobIdFromRow(
+  row: Record<string, string>,
+  mapping: Record<ImveMappedField, string | null>,
+  index: number
+): string {
+  const id = pickMappedField(row, mapping, "imve_id");
+  const ref = extractJobReferenceFromRow(row, mapping);
   if (id) return id;
   if (ref) return ref;
-  const email = pickField(row, [...IMVE_FIELD_ALIASES.email]);
-  const move = pickField(row, [...IMVE_FIELD_ALIASES.moveDate]);
+  const email = pickMappedField(row, mapping, "customer_email");
+  const move = pickMappedField(row, mapping, "move_date");
   return `row-${index}-${email ?? "unknown"}-${move ?? "nodate"}`;
 }
 
 export function normalizeImveJobs(
   rows: Record<string, string>[],
-  fileHash: string
+  fileHash: string,
+  mapping: Record<ImveMappedField, string | null>
 ): ImveJobRecord[] {
   const now = new Date().toISOString();
   return rows.map((row, index) => {
-    const jobRefRaw = pickField(row, [...IMVE_FIELD_ALIASES.jobReference]);
-    const jobRef =
-      extractJobReference(jobRefRaw ?? "") ??
-      (jobRefRaw ? jobRefRaw.toUpperCase() : null);
-    const fromPostcode = pickField(row, [...IMVE_FIELD_ALIASES.fromPostcode]);
-    const status = pickField(row, [...IMVE_FIELD_ALIASES.status]);
-    const depositPaidField = pickField(row, [...IMVE_FIELD_ALIASES.depositPaid]);
+    const jobRef = extractJobReferenceFromRow(row, mapping);
+    const fromPostcode = pickMappedField(row, mapping, "collection_postcode");
+    const status =
+      pickMappedField(row, mapping, "job_status") ??
+      pickMappedField(row, mapping, "booking_status");
+    const bookingStatus = pickMappedField(row, mapping, "booking_status");
+    const depositPaidField =
+      pickMappedField(row, mapping, "deposit_paid_at") ??
+      bookingStatus ??
+      status;
     const depositPaid =
       parseBool(depositPaidField) ||
-      /deposit.*paid|booked|confirmed/i.test(status ?? "");
+      /deposit.*paid|booked|confirmed|paid/i.test(status ?? "") ||
+      /booked|confirmed/i.test(bookingStatus ?? "");
+
+    const email =
+      pickMappedField(row, mapping, "customer_email")?.toLowerCase() ?? null;
+    const phoneRaw = pickMappedField(row, mapping, "customer_phone");
 
     return {
-      imve_id: jobIdFromRow(row, index),
+      imve_id: jobIdFromRow(row, mapping, index),
       job_reference: jobRef,
-      customer_name: pickField(row, [...IMVE_FIELD_ALIASES.customerName]),
-      customer_email: pickField(row, [...IMVE_FIELD_ALIASES.email])?.toLowerCase() ?? null,
-      customer_phone: pickField(row, [...IMVE_FIELD_ALIASES.phone]),
-      move_date: parseDate(pickField(row, [...IMVE_FIELD_ALIASES.moveDate])),
+      customer_name: pickMappedField(row, mapping, "customer_name"),
+      customer_email: email,
+      customer_phone: phoneRaw ? (normalizePhone(phoneRaw) ?? phoneRaw) : null,
+      move_date: parseDate(pickMappedField(row, mapping, "move_date")),
       from_postcode: fromPostcode,
-      to_postcode: pickField(row, [...IMVE_FIELD_ALIASES.toPostcode]),
+      to_postcode: pickMappedField(row, mapping, "delivery_postcode"),
       from_area: extractPostcodeArea(fromPostcode),
-      lead_source: pickField(row, [...IMVE_FIELD_ALIASES.leadSource]),
+      lead_source: pickMappedField(row, mapping, "lead_source"),
       status,
-      quote_value: parseMoney(pickField(row, [...IMVE_FIELD_ALIASES.quoteValue])),
-      booked: /booked|confirmed|deposit|paid|complete/i.test(status ?? "") || depositPaid,
+      quote_value: parseMoney(
+        pickMappedField(row, mapping, "quote_value") ??
+          pickMappedField(row, mapping, "invoice_total")
+      ),
+      booked:
+        /booked|confirmed|deposit|paid|complete/i.test(status ?? "") ||
+        /booked|confirmed/i.test(bookingStatus ?? "") ||
+        depositPaid,
       deposit_paid: depositPaid,
       deposit_paid_at: depositPaid
-        ? parseDate(pickField(row, [...IMVE_FIELD_ALIASES.depositPaidAt]))
+        ? parseDate(pickMappedField(row, mapping, "deposit_paid_at"))
         : null,
-      deposit_amount: parseMoney(
-        pickField(row, [...IMVE_FIELD_ALIASES.depositAmount])
-      ),
-      turnover: parseMoney(pickField(row, [...IMVE_FIELD_ALIASES.turnover])),
+      deposit_amount: parseMoney(pickMappedField(row, mapping, "deposit_amount")),
+      turnover: parseMoney(pickMappedField(row, mapping, "invoice_total")),
       commission: null,
       source_file_hash: fileHash,
       updated_at: now,
@@ -97,30 +119,48 @@ export function normalizeImveJobs(
 function normalizeInvoice(
   rows: Record<string, string>[],
   fileHash: string,
-  invoiceType: ImveInvoiceRecord["invoice_type"]
+  invoiceType: ImveInvoiceRecord["invoice_type"],
+  mapping: Record<ImveMappedField, string | null>
 ): ImveInvoiceRecord[] {
   return rows.map((row, index) => {
-    const refRaw = pickField(row, [...IMVE_FIELD_ALIASES.jobReference]);
-    const jobRef =
-      extractJobReference(refRaw ?? "") ??
-      (refRaw ? refRaw.toUpperCase() : null);
-    const paidField = pickField(row, [...IMVE_FIELD_ALIASES.paid]);
-    const status = pickField(row, [...IMVE_FIELD_ALIASES.status]);
+    const jobRef = extractJobReferenceFromRow(row, mapping);
+    const paidField =
+      pickMappedField(row, mapping, "job_status") ??
+      pickMappedField(row, mapping, "booking_status");
+    const status = paidField;
     const paid =
       parseBool(paidField) ||
-      /paid|complete/i.test(status ?? "") ||
-      invoiceType === "deposit";
+      /paid|complete|received/i.test(status ?? "") ||
+      (invoiceType === "deposit" &&
+        !/unpaid|outstanding|pending/i.test(status ?? ""));
+
+    const amount =
+      parseMoney(
+        pickMappedField(row, mapping, "invoice_total") ??
+          pickMappedField(row, mapping, "deposit_amount") ??
+          pickMappedField(row, mapping, "quote_value")
+      ) ?? parseMoney(pickMappedField(row, mapping, "deposit_amount"));
+
+    const email =
+      pickMappedField(row, mapping, "customer_email")?.toLowerCase() ?? null;
+    const phoneRaw = pickMappedField(row, mapping, "customer_phone");
 
     return {
       invoice_id:
-        pickField(row, [...IMVE_FIELD_ALIASES.invoiceId]) ?? `${invoiceType}-${index}`,
+        pickMappedField(row, mapping, "invoice_reference") ??
+        `${invoiceType}-${index}`,
       job_reference: jobRef,
-      customer_name: pickField(row, [...IMVE_FIELD_ALIASES.customerName]),
-      invoice_date: parseDate(pickField(row, [...IMVE_FIELD_ALIASES.invoiceDate])),
-      amount: parseMoney(pickField(row, [...IMVE_FIELD_ALIASES.quoteValue])),
-      paid,
+      customer_name: pickMappedField(row, mapping, "customer_name"),
+      customer_email: email,
+      customer_phone: phoneRaw ? (normalizePhone(phoneRaw) ?? phoneRaw) : null,
+      invoice_date: parseDate(
+        pickMappedField(row, mapping, "deposit_paid_at") ??
+          pickMappedField(row, mapping, "move_date")
+      ),
+      amount,
+      paid: invoiceType === "deposit" ? paid || amount != null : paid,
       paid_at: paid
-        ? parseDate(pickField(row, [...IMVE_FIELD_ALIASES.depositPaidAt]))
+        ? parseDate(pickMappedField(row, mapping, "deposit_paid_at"))
         : null,
       invoice_type: invoiceType,
       source_file_hash: fileHash,
@@ -140,8 +180,18 @@ export function normalizeImveFile(
   invoices: ImveInvoiceRecord[];
   raw: ImveRawFileAudit;
   warnings: string[];
+  column_mapping: Record<ImveMappedField, string | null>;
 } {
   const warnings: string[] = [];
+  const column_mapping = resolveColumnMapping(columns, rows);
+
+  const mappedCount = Object.values(column_mapping).filter(Boolean).length;
+  if (mappedCount < 3 && rows.length > 0) {
+    warnings.push(
+      `Only ${mappedCount} columns mapped from headers: ${columns.join(", ")}`
+    );
+  }
+
   const raw: ImveRawFileAudit = {
     file_hash: fileHash,
     filename,
@@ -150,18 +200,29 @@ export function normalizeImveFile(
     row_count: rows.length,
     columns,
     rows,
+    column_mapping,
   };
 
   if (fileType === "unknown") {
-    warnings.push("Could not confidently detect file type from filename/columns.");
+    warnings.push(
+      `Could not detect file type for "${filename}" — headers: ${columns.join(", ")}`
+    );
+    return {
+      jobs: [],
+      invoices: [],
+      raw,
+      warnings,
+      column_mapping,
+    };
   }
 
   if (fileType === "jobs") {
     return {
-      jobs: normalizeImveJobs(rows, fileHash),
+      jobs: normalizeImveJobs(rows, fileHash, column_mapping),
       invoices: [],
       raw,
       warnings,
+      column_mapping,
     };
   }
 
@@ -174,9 +235,10 @@ export function normalizeImveFile(
 
   return {
     jobs: [],
-    invoices: normalizeInvoice(rows, fileHash, invoiceType),
+    invoices: normalizeInvoice(rows, fileHash, invoiceType, column_mapping),
     raw,
     warnings,
+    column_mapping,
   };
 }
 
@@ -192,7 +254,23 @@ export function mergeImveJobs(
   for (const job of incoming) {
     const key = job.job_reference ?? job.imve_id;
     const prev = map.get(key);
-    map.set(key, prev ? { ...prev, ...job, updated_at: job.updated_at } : job);
+    if (prev) {
+      map.set(key, {
+        ...prev,
+        ...job,
+        customer_email: job.customer_email ?? prev.customer_email,
+        customer_phone: job.customer_phone ?? prev.customer_phone,
+        customer_name: job.customer_name ?? prev.customer_name,
+        deposit_paid: job.deposit_paid || prev.deposit_paid,
+        deposit_paid_at: job.deposit_paid_at ?? prev.deposit_paid_at,
+        deposit_amount: job.deposit_amount ?? prev.deposit_amount,
+        turnover: job.turnover ?? prev.turnover,
+        quote_value: job.quote_value ?? prev.quote_value,
+        updated_at: job.updated_at,
+      });
+    } else {
+      map.set(key, job);
+    }
   }
   return [...map.values()];
 }
@@ -202,61 +280,10 @@ export function applyInvoicesToJobs(
   invoices: ImveInvoiceRecord[],
   commissionRate: number
 ): ImveJobRecord[] {
-  const byRef = new Map(jobs.map((j) => [j.job_reference ?? j.imve_id, { ...j }]));
-
-  for (const inv of invoices) {
-    if (!inv.job_reference) continue;
-    let job = byRef.get(inv.job_reference);
-    if (!job) {
-      job = {
-        imve_id: inv.job_reference,
-        job_reference: inv.job_reference,
-        customer_name: inv.customer_name,
-        customer_email: null,
-        customer_phone: null,
-        move_date: null,
-        from_postcode: null,
-        to_postcode: null,
-        from_area: "Unknown",
-        lead_source: null,
-        status: null,
-        quote_value: null,
-        booked: false,
-        deposit_paid: false,
-        deposit_paid_at: null,
-        deposit_amount: null,
-        turnover: null,
-        commission: null,
-        source_file_hash: inv.source_file_hash,
-        updated_at: new Date().toISOString(),
-      };
-      byRef.set(inv.job_reference, job);
-    }
-
-    if (inv.invoice_type === "deposit" && inv.paid) {
-      job.deposit_paid = true;
-      job.deposit_paid_at = inv.paid_at ?? inv.invoice_date ?? job.deposit_paid_at;
-      job.deposit_amount = inv.amount ?? job.deposit_amount;
-      job.booked = true;
-    }
-
-    if (inv.invoice_type === "job" && inv.amount != null) {
-      job.turnover = inv.amount;
-      if (inv.paid) job.booked = true;
-    }
-
-    if (inv.invoice_type === "custom" && inv.amount != null) {
-      job.turnover = (job.turnover ?? 0) + inv.amount;
-    }
-  }
-
-  return [...byRef.values()].map((job) => {
-    const turnover = job.turnover ?? job.quote_value;
-    const commission =
-      turnover != null ? Math.round(turnover * commissionRate * 100) / 100 : null;
-    return { ...job, turnover, commission };
-  });
+  return applyInvoicesToJobsWithLinking(jobs, invoices, commissionRate).jobs;
 }
+
+export { applyInvoicesToJobsWithLinking } from "./imve-invoice-link";
 
 export function mergeImveInvoices(
   existing: ImveInvoiceRecord[],
@@ -270,4 +297,40 @@ export function mergeImveInvoices(
     map.set(`${inv.invoice_type}:${inv.invoice_id}`, inv);
   }
   return [...map.values()];
+}
+
+export function renormalizeLedgerFromRaw(
+  rawFiles: ImveRawFileAudit[],
+  commissionRate: number
+): {
+  jobs: ImveJobRecord[];
+  invoices: ImveInvoiceRecord[];
+  warnings: string[];
+} {
+  const allJobs: ImveJobRecord[] = [];
+  const allInvoices: ImveInvoiceRecord[] = [];
+  const warnings: string[] = [];
+
+  for (const raw of rawFiles) {
+    const parsed = normalizeImveFile(
+      raw.file_type,
+      raw.filename,
+      raw.file_hash,
+      raw.columns,
+      raw.rows
+    );
+    allJobs.push(...parsed.jobs);
+    allInvoices.push(...parsed.invoices);
+    warnings.push(...parsed.warnings);
+  }
+
+  const mergedJobs = mergeImveJobs([], allJobs);
+  const mergedInvoices = mergeImveInvoices([], allInvoices);
+  const { jobs } = applyInvoicesToJobsWithLinking(
+    mergedJobs,
+    mergedInvoices,
+    commissionRate
+  );
+
+  return { jobs, invoices: mergedInvoices, warnings };
 }

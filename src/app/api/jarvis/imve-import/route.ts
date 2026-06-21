@@ -11,11 +11,11 @@ import {
 import {
   confirmImveImport,
   createImveImportPreview,
+  rematchImveImport,
   type ImveUploadedFile,
 } from "@/lib/jarvis/imve-import";
-import {
-  getImveImportLedgerOrEmpty,
-} from "@/lib/jarvis/imve-store";
+import { buildImveImportDebug } from "@/lib/jarvis/imve-debug";
+import { getImveImportLedgerOrEmpty } from "@/lib/jarvis/imve-store";
 import { isImveRoiActive } from "@/lib/jarvis/imve-validate";
 import { getCmmLeadLedger } from "@/lib/jarvis/cmm-lead-store";
 import { getJarvisSettings } from "@/lib/jarvis/settings-store";
@@ -30,25 +30,11 @@ export async function GET() {
   }
 
   try {
+    const settings = await getJarvisSettings();
     const ledger = await getImveImportLedgerOrEmpty();
     const matchLedger = await getImveCmmMatchLedger();
-
-    const matchSamples = matchLedger
-      ? Object.values(matchLedger.matches)
-          .filter(
-            (m) =>
-              m.match_status === "auto_matched" || m.match_status === "approved"
-          )
-          .slice(0, 8)
-          .map((m) => ({
-            lead_id: m.lead_id,
-            job_reference: m.job_reference,
-            confidence: m.match_confidence,
-            reason: m.match_reason,
-            status: m.match_status,
-            deposit_paid: m.deposit_paid,
-          }))
-      : [];
+    const cmmLeads = (await getCmmLeadLedger())?.leads ?? [];
+    const debug = buildImveImportDebug(ledger, matchLedger, cmmLeads, settings);
 
     return NextResponse.json({
       ledger: {
@@ -67,7 +53,7 @@ export async function GET() {
         })),
       },
       matchLedger,
-      matchSamples,
+      debug,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Import status failed";
@@ -112,11 +98,13 @@ export async function POST(request: Request) {
       leadId?: string;
     };
     const settings = await getJarvisSettings();
+    const cmmLeads = (await getCmmLeadLedger())?.leads ?? [];
 
     if (body.action === "confirm" && body.sessionId) {
       const ledger = await confirmImveImport(body.sessionId, settings);
       const intelligence = await loadCmmLeadIntelligence(settings, { rematch: true });
       const matchLedger = await getImveCmmMatchLedger();
+      const debug = buildImveImportDebug(ledger, matchLedger, cmmLeads, settings);
       return NextResponse.json({
         ledger: {
           jobCount: ledger.jobs.length,
@@ -126,17 +114,15 @@ export async function POST(request: Request) {
         },
         matchLedger,
         intelligence,
+        debug,
       });
     }
 
-    if (body.action === "rematch") {
-      const leads = (await getCmmLeadLedger())?.leads ?? [];
-      const imveLedger = await getImveImportLedgerOrEmpty();
-      const prior = await getImveCmmMatchLedger();
-      const matchLedger = runImveCmmMatching(leads, imveLedger.jobs, prior);
-      await saveImveCmmMatchLedger(matchLedger);
-      const intelligence = await loadCmmLeadIntelligence(settings);
-      return NextResponse.json({ matchLedger, intelligence });
+    if (body.action === "rematch" || body.action === "rebuild") {
+      const { ledger, matchLedger } = await rematchImveImport(settings);
+      const intelligence = await loadCmmLeadIntelligence(settings, { rematch: true });
+      const debug = buildImveImportDebug(ledger, matchLedger, cmmLeads, settings);
+      return NextResponse.json({ ledger, matchLedger, intelligence, debug });
     }
 
     if (
@@ -154,14 +140,16 @@ export async function POST(request: Request) {
         body.action === "approve" ? "approve" : "reject",
         imveLedger.jobs
       );
-      matchLedger = runImveCmmMatching(
-        (await getCmmLeadLedger())?.leads ?? [],
-        imveLedger.jobs,
-        matchLedger
-      );
+      matchLedger = runImveCmmMatching(cmmLeads, imveLedger.jobs, matchLedger);
       await saveImveCmmMatchLedger(matchLedger);
       const intelligence = await loadCmmLeadIntelligence(settings);
-      return NextResponse.json({ matchLedger, intelligence });
+      const debug = buildImveImportDebug(
+        imveLedger,
+        matchLedger,
+        cmmLeads,
+        settings
+      );
+      return NextResponse.json({ matchLedger, intelligence, debug });
     }
 
     return NextResponse.json({ error: "Unknown action" }, { status: 400 });

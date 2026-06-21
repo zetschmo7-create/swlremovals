@@ -7,22 +7,33 @@ import type {
 } from "./imve-types";
 import type { CmmLeadRecord } from "./types";
 import { normalizePhone } from "./cmm-match-scoring";
-import { parseEmailDate } from "./extractors";
+import { extractPostcodeArea, parseEmailDate } from "./extractors";
 
-const AUTO_MATCH = 90;
-const REVIEW_MIN = 70;
+const AUTO_MATCH = 85;
+const REVIEW_MIN = 55;
 
 function normalizePostcode(pc: string | null): string {
   return (pc ?? "").replace(/\s+/g, "").toUpperCase();
 }
 
+function normalizeName(name: string | null): string {
+  return (name ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function nameSimilarity(a: string | null, b: string | null): number {
-  const na = (a ?? "").toLowerCase().trim();
-  const nb = (b ?? "").toLowerCase().trim();
+  const na = normalizeName(a);
+  const nb = normalizeName(b);
   if (!na || !nb) return 0;
   if (na === nb) return 1;
-  const ta = new Set(na.split(/\s+/));
-  const tb = new Set(nb.split(/\s+/));
+  if (na.includes(nb) || nb.includes(na)) return 0.88;
+
+  const ta = new Set(na.split(" ").filter(Boolean));
+  const tb = new Set(nb.split(" ").filter(Boolean));
+  if (ta.size === 0 || tb.size === 0) return 0;
   let overlap = 0;
   for (const t of ta) if (tb.has(t)) overlap += 1;
   return overlap / Math.max(ta.size, tb.size);
@@ -82,15 +93,32 @@ export function scoreImveLeadMatch(
   if (leadPc && jobPc && leadPc === jobPc) {
     score += 12;
     reasons.push("postcode_match");
+  } else {
+    const leadArea = extractPostcodeArea(
+      lead.collection_postcode ?? lead.current_postcode
+    );
+    const jobArea = job.from_area ?? extractPostcodeArea(job.from_postcode);
+    if (
+      leadArea &&
+      jobArea &&
+      leadArea !== "Unknown" &&
+      jobArea !== "Unknown" &&
+      leadArea === jobArea
+    ) {
+      score += 8;
+      reasons.push("postcode_area_match");
+    }
   }
 
-  score += moveDateScore(lead.move_date, job.move_date);
-  if (moveDateScore(lead.move_date, job.move_date) > 0) {
+  const dateScore = moveDateScore(lead.move_date, job.move_date);
+  score += dateScore;
+  if (dateScore > 0) {
     reasons.push("move_date_proximity");
   }
 
-  score += leadSourceScore(lead, job);
-  if (leadSourceScore(lead, job) > 0) reasons.push("lead_source_cmm");
+  const sourceScore = leadSourceScore(lead, job);
+  score += sourceScore;
+  if (sourceScore > 0) reasons.push("lead_source_cmm");
 
   if (job.deposit_paid) {
     score += 3;
@@ -104,6 +132,40 @@ function classifyImveScore(score: number): ImveCmmLeadMatch["match_status"] {
   if (score >= AUTO_MATCH) return "auto_matched";
   if (score >= REVIEW_MIN) return "needs_review";
   return "unmatched";
+}
+
+export function rankImveCandidatesForLead(
+  lead: CmmLeadRecord,
+  jobs: ImveJobRecord[],
+  limit = 3
+): Array<{ job: ImveJobRecord; score: number; reasons: string[] }> {
+  return jobs
+    .map((job) => ({ job, ...scoreImveLeadMatch(lead, job) }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit);
+}
+
+export function explainImveMatchDecision(
+  lead: CmmLeadRecord,
+  topCandidate: { job: ImveJobRecord; score: number; reasons: string[] }
+): string {
+  const status = classifyImveScore(topCandidate.score);
+  const parts = [
+    `Score ${topCandidate.score}/100 → ${status}`,
+    `Signals: ${topCandidate.reasons.join(", ") || "none"}`,
+    `Lead: ${lead.customer_name ?? "?"} (${lead.customer_email ?? "no email"})`,
+    `Job: ${topCandidate.job.customer_name ?? "?"} (${topCandidate.job.job_reference ?? topCandidate.job.imve_id})`,
+  ];
+  if (status === "auto_matched") {
+    parts.push(`Met auto-match threshold (${AUTO_MATCH}).`);
+  } else if (status === "needs_review") {
+    parts.push(
+      `Below auto-match (${AUTO_MATCH}) but above review minimum (${REVIEW_MIN}).`
+    );
+  } else {
+    parts.push(`Below review minimum (${REVIEW_MIN}).`);
+  }
+  return parts.join(" · ");
 }
 
 export function runImveCmmMatching(
