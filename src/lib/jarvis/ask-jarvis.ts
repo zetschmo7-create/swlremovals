@@ -1,4 +1,8 @@
 import type { JarvisBriefing, PostcodeArea } from "./types";
+import {
+  answerCommercialIntelligenceQuestion,
+  genericJarvisFallback,
+} from "./ask-jarvis-commercial";
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat("en-GB", {
@@ -20,8 +24,11 @@ export function answerJarvisQuestion(
 ): string {
   const q = question.toLowerCase().trim();
   if (!q) {
-    return "Ask me about leads, commission, CMM spend, postcode ROI, pipeline, surveys, or follow-ups.";
+    return "Ask me for a business breakdown, area performance, commission forecast, or what to focus on today.";
   }
+
+  const commercial = answerCommercialIntelligenceQuestion(briefing, question);
+  if (commercial) return commercial;
 
   const cmm = briefing.cmmLeadIntelligence;
 
@@ -176,5 +183,5 @@ export function answerJarvisQuestion(
     return briefing.todaysFocus.map((item, i) => `${i + 1}. ${item}`).join("\n");
   }
 
-  return "I can answer questions about CMM spend, postcode ROI, Friday commission, deposit receipts, accepted quotes, conversion rates, survey slots, and pipeline.";
+  return genericJarvisFallback(question);
 }

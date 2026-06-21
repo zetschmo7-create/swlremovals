@@ -1,5 +1,6 @@
 import type { JarvisBriefing, PostcodeArea } from "./types";
 import { answerJarvisQuestion } from "./ask-jarvis";
+import { answerCommercialIntelligenceQuestion } from "./ask-jarvis-commercial";
 
 const VOICE_ANSWER_MAX = 900;
 const TTS_MAX = 1200;
@@ -49,8 +50,13 @@ function answerJarvisQuestionVoiceAware(
 ): string {
   const q = question.toLowerCase().trim();
   if (!q) {
-    return "Ask me about urgent tasks, CMM leads, commission, postcode ROI, or what to focus on today.";
+    return "Ask me for a business breakdown, area performance, commission forecast, or what to focus on today.";
   }
+
+  const commercial = answerCommercialIntelligenceQuestion(briefing, question, {
+    voice: true,
+  });
+  if (commercial) return commercial;
 
   if (/highest roi|roi task|best roi|highest return/i.test(q)) {
     const focus = briefing.todaysFocus.slice(0, 3);
