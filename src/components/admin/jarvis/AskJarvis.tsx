@@ -4,6 +4,7 @@ import { useState } from "react";
 import { MessageSquare } from "lucide-react";
 import type { JarvisBriefing } from "@/lib/jarvis/types";
 import { answerJarvisQuestion } from "@/lib/jarvis/ask-jarvis";
+import { VoiceMode } from "./VoiceMode";
 
 const SUGGESTIONS = [
   "How much did we spend on CMM this week?",
@@ -71,6 +72,8 @@ export function AskJarvis({ briefing }: { briefing: JarvisBriefing }) {
           </p>
         </div>
       )}
+
+      <VoiceMode briefing={briefing} />
     </div>
   );
 }
