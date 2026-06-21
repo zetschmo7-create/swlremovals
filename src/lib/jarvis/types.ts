@@ -202,6 +202,23 @@ export type CmmLeadIntelligence = {
   } | null;
   needsSetup: boolean;
   setupMessage: string | null;
+  completeness: CmmCompletenessStats;
+};
+
+export type CmmCompletenessStats = {
+  totalLeads: number;
+  withFullName: number;
+  withEmail: number;
+  withPhone: number;
+  withCurrentPostcode: number;
+  withNewPostcode: number;
+  withMoveDate: number;
+  incompleteSamples: Array<{
+    customer_name: string | null;
+    customer_email: string | null;
+    customer_phone: string | null;
+    received_at: string;
+  }>;
 };
 
 export type SalesGptIntent =

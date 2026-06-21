@@ -257,6 +257,42 @@ export function CmmLeadIntelligencePanel({
       </div>
 
       <div className="jarvis-glass mb-6 rounded-xl p-4">
+        <p className="mb-3 text-xs uppercase tracking-widest text-violet-400/80">
+          CMM lead completeness
+        </p>
+        <dl className="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
+          <StatusRow label="Total leads" value={data.completeness?.totalLeads ?? data.leadsAllTime} />
+          <StatusRow label="Full name" value={data.completeness?.withFullName ?? 0} />
+          <StatusRow label="With email" value={data.completeness?.withEmail ?? 0} />
+          <StatusRow label="With phone" value={data.completeness?.withPhone ?? 0} />
+          <StatusRow
+            label="Current postcode"
+            value={data.completeness?.withCurrentPostcode ?? 0}
+          />
+          <StatusRow
+            label="New postcode"
+            value={data.completeness?.withNewPostcode ?? 0}
+          />
+          <StatusRow label="Move date" value={data.completeness?.withMoveDate ?? 0} />
+        </dl>
+        {(data.completeness?.incompleteSamples?.length ?? 0) > 0 && (
+          <div className="mt-4">
+            <p className="mb-2 text-xs text-amber-300/90">
+              Sample incomplete leads (rebuild should repair these)
+            </p>
+            <ul className="space-y-1 text-xs text-slate-400">
+              {data.completeness.incompleteSamples.map((l, i) => (
+                <li key={`${l.received_at}-${i}`}>
+                  {l.customer_name ?? "Unknown"} · {l.customer_email ?? "no email"} ·{" "}
+                  {l.customer_phone ?? "no phone"}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+
+      <div className="jarvis-glass mb-6 rounded-xl p-4">
         <p className="mb-3 text-xs uppercase tracking-widest text-emerald-400/80">
           Lead → job matching
         </p>

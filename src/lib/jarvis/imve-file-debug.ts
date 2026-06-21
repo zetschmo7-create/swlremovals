@@ -20,7 +20,8 @@ export function buildFileMappingDebug(input: {
   column_mapping?: Record<ImveMappedField, string | null>;
 }): ImveFileMappingDebug {
   const mapping =
-    input.column_mapping ?? resolveColumnMapping(input.columns, input.rows);
+    input.column_mapping ??
+    resolveColumnMapping(input.columns, input.rows, input.file_type);
   const normalizedCount =
     input.file_type === "jobs"
       ? input.normalized_job_count

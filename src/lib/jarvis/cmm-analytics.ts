@@ -27,6 +27,7 @@ import { getImveCmmMatchLedger } from "./imve-cmm-match-store";
 import { isImveMatchUsableForRoi } from "./imve-cmm-match";
 import { imveJobToJobRecord } from "./imve-to-job";
 import type { ImveCmmLeadMatch, ImveJobRecord } from "./imve-types";
+import { buildCmmCompletenessStats } from "./cmm-completeness";
 
 const ALL_AREAS: PostcodeArea[] = ["GU", "RH", "TN", "SM", "CR", "Other", "Unknown"];
 
@@ -375,6 +376,7 @@ export function buildCmmLeadIntelligenceFromLeads(
         : null,
     needsSetup,
     setupMessage,
+    completeness: buildCmmCompletenessStats(leads),
   };
 }
 

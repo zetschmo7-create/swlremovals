@@ -4,6 +4,7 @@ import {
   extractJobReferenceFromRow,
   pickMappedField,
   resolveColumnMapping,
+  validateColumnMapping,
   type ImveMappedField,
 } from "./imve-column-map";
 import { applyInvoicesToJobsWithLinking } from "./imve-invoice-link";
@@ -183,7 +184,8 @@ export function normalizeImveFile(
   column_mapping: Record<ImveMappedField, string | null>;
 } {
   const warnings: string[] = [];
-  const column_mapping = resolveColumnMapping(columns, rows);
+  const column_mapping = resolveColumnMapping(columns, rows, fileType);
+  warnings.push(...validateColumnMapping(column_mapping, fileType, columns, rows));
 
   const mappedCount = Object.values(column_mapping).filter(Boolean).length;
   if (mappedCount < 3 && rows.length > 0) {

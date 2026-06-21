@@ -9,6 +9,9 @@ const CMM_SUBJECT =
 const UK_POSTCODE =
   /\b([A-Z]{1,2}\d{1,2}[A-Z]?\s?\d[A-Z]{2})\b/i;
 
+const UK_POSTCODE_GLOBAL =
+  /\b([A-Z]{1,2}\d{1,2}[A-Z]?\s?\d[A-Z]{2})\b/gi;
+
 const SECTION_HEADERS = [
   "Contact Details",
   "Moving Date",
@@ -23,12 +26,33 @@ function normalizePhone(raw: string): string {
 }
 
 function isEmailLine(line: string): boolean {
-  return /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i.test(line);
+  return extractEmailFromLine(line) != null;
+}
+
+function extractEmailFromLine(line: string): string | null {
+  const trimmed = line.trim();
+  const prefixed = trimmed.match(/^(?:e-?mail:?\s*)(.+)$/i);
+  const candidate = (prefixed ? prefixed[1] : trimmed).trim();
+  if (/^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i.test(candidate)) {
+    return candidate.toLowerCase();
+  }
+  const inline = candidate.match(
+    /\b([a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,})\b/i
+  );
+  return inline ? inline[1].toLowerCase() : null;
+}
+
+function extractPhoneFromLine(line: string): string | null {
+  const trimmed = line.trim();
+  const prefixed = trimmed.match(/^(?:phone|tel|mobile|telephone):?\s*(.+)$/i);
+  const candidate = prefixed ? prefixed[1] : trimmed;
+  const digits = candidate.replace(/[^\d+]/g, "");
+  if (digits.length >= 10) return normalizePhone(candidate);
+  return null;
 }
 
 function isPhoneLine(line: string): boolean {
-  const digits = line.replace(/[^\d+]/g, "");
-  return digits.length >= 10;
+  return extractPhoneFromLine(line) != null;
 }
 
 function parsePostcodeFromLine(line: string): string | null {
@@ -83,11 +107,22 @@ function parseFlexible(text: string): boolean | null {
   return match[1].toLowerCase() === "yes";
 }
 
+function normalizeCmmLeadText(text: string): string {
+  let t = text.replace(/\r/g, "");
+  const headers = [...SECTION_HEADERS, "CMM internal ID:"];
+  for (const header of headers) {
+    const escaped = header.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    t = t.replace(new RegExp(`\\s*${escaped}\\s*`, "gi"), `\n${header}\n`);
+  }
+  return t;
+}
+
 function splitSections(text: string): Map<string, string[]> {
   const sections = new Map<string, string[]>();
   let current: string | null = null;
+  const normalized = normalizeCmmLeadText(text);
 
-  for (const rawLine of text.replace(/\r/g, "").split("\n")) {
+  for (const rawLine of normalized.split("\n")) {
     const line = rawLine.trim();
     if (!line) continue;
 
@@ -163,20 +198,128 @@ function parseContactSection(lines: string[]): {
   let email: string | null = null;
 
   for (const line of lines) {
-    if (!email && isEmailLine(line)) {
-      email = line.toLowerCase();
+    const parsedEmail = extractEmailFromLine(line);
+    if (!email && parsedEmail) {
+      email = parsedEmail;
       continue;
     }
-    if (!phone && isPhoneLine(line)) {
-      phone = normalizePhone(line);
-      continue;
+    if (!phone) {
+      const parsedPhone = extractPhoneFromLine(line);
+      if (parsedPhone) {
+        phone = parsedPhone;
+        continue;
+      }
     }
-    if (!name && !isEmailLine(line) && !isPhoneLine(line)) {
+    if (!name && !parsedEmail && !extractPhoneFromLine(line)) {
       name = line;
     }
   }
 
   return { name, phone, email };
+}
+
+function extractContactFallback(text: string): {
+  name: string | null;
+  phone: string | null;
+  email: string | null;
+} {
+  const normalized = normalizeCmmLeadText(text);
+  let name: string | null = null;
+  let phone: string | null = null;
+  let email: string | null = null;
+
+  const emailMatches = [
+    ...normalized.matchAll(/\b([a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,})\b/gi),
+  ].map((m) => m[1].toLowerCase());
+  email =
+    emailMatches.find((e) => !e.includes("comparemymove")) ??
+    emailMatches[0] ??
+    null;
+
+  const phoneMatches = [
+    ...normalized.matchAll(/\b(0\d{10,11}|\+44\d{10,11}|07\d{9})\b/g),
+  ];
+  if (phoneMatches[0]) {
+    phone = normalizePhone(phoneMatches[0][1]);
+  }
+
+  const afterContact = normalized.split(/contact details/i)[1];
+  if (afterContact) {
+    let block = afterContact.trim();
+    for (const header of SECTION_HEADERS) {
+      const idx = block.toLowerCase().indexOf(header.toLowerCase());
+      if (idx > 0) block = block.slice(0, idx);
+    }
+    if (email) block = block.replace(new RegExp(email.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i"), " ");
+    if (phone) {
+      block = block.replace(new RegExp(phone.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"), " ");
+      block = block.replace(/\b0\d{10}\b/g, " ");
+    }
+    block = block.replace(/\b[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}\b/gi, " ");
+    block = block.replace(/\b(0\d{10,11}|07\d{9})\b/g, " ");
+    block = block.replace(/\s+/g, " ").trim();
+    if (block.length > 2 && !UK_POSTCODE.test(block)) {
+      name = block;
+    }
+
+    for (const rawLine of afterContact.split("\n")) {
+      const line = rawLine.trim();
+      if (!line) continue;
+      const header = SECTION_HEADERS.find(
+        (h) => line.toLowerCase() === h.toLowerCase()
+      );
+      if (header) break;
+      if (extractEmailFromLine(line) || extractPhoneFromLine(line)) continue;
+      if (line.length > 2 && !UK_POSTCODE.test(line)) {
+        if (!name || line.split(/\s+/).length > name.split(/\s+/).length) {
+          name = line;
+        }
+        break;
+      }
+    }
+  }
+
+  return { name, phone, email };
+}
+
+function preferCustomerName(
+  contactName: string | null,
+  fallbackName: string | null,
+  subjectName: string | null
+): string | null {
+  const candidates = [contactName, fallbackName, subjectName].filter(
+    (n): n is string => Boolean(n?.trim())
+  );
+  if (candidates.length === 0) return null;
+  return candidates.sort((a, b) => b.split(/\s+/).length - a.split(/\s+/).length)[0];
+}
+
+function extractMoveDateFallback(text: string): string | null {
+  const normalized = normalizeCmmLeadText(text);
+  const section = normalized.split(/moving date/i)[1];
+  if (!section) return null;
+  const line = section
+    .split("\n")
+    .map((l) => l.trim())
+    .find((l) => l && !/^flexible:/i.test(l) && !SECTION_HEADERS.some((h) => l.toLowerCase() === h.toLowerCase()));
+  return line ? parseMovingDate(line) : null;
+}
+
+function extractPostcodesFallback(text: string): {
+  current: string | null;
+  delivery: string | null;
+} {
+  const normalized = normalizeCmmLeadText(text);
+  const currentBlock = normalized.split(/current address/i)[1]?.split(/new address/i)[0] ?? "";
+  const newBlock = normalized.split(/new address/i)[1] ?? "";
+  const currentPc =
+    [...currentBlock.matchAll(UK_POSTCODE_GLOBAL)].map((m) =>
+      normalizePostcode(m[1])
+    ).pop() ?? null;
+  const newPc =
+    [...newBlock.matchAll(UK_POSTCODE_GLOBAL)].map((m) => normalizePostcode(m[1])).pop() ??
+    null;
+  return { current: currentPc, delivery: newPc };
 }
 
 export type CmmParseResult = {
@@ -201,12 +344,14 @@ export function parseCmmLeadText(
 
   const sections = splitSections(text);
   const contact = parseContactSection(sections.get("Contact Details") ?? []);
+  const fallback = extractContactFallback(text);
   const movingLines = sections.get("Moving Date") ?? [];
   const movingDateRaw = movingLines.find((l) => !/^flexible:/i.test(l)) ?? null;
   const flexible = parseFlexible(movingLines.join(" ") + " " + text);
 
   const current = parseAddressSection(sections.get("Current Address") ?? []);
   const newAddr = parseAddressSection(sections.get("New Address") ?? []);
+  const postcodeFallback = extractPostcodesFallback(text);
 
   const additionalServices =
     (sections.get("Additional Services") ?? []).join(", ") || null;
@@ -224,10 +369,19 @@ export function parseCmmLeadText(
     : null;
 
   const subjectMatch = meta.subject.match(CMM_SUBJECT);
-  const customerName = contact.name ?? subjectMatch?.[1]?.trim() ?? null;
-  const movingDate = movingDateRaw ? parseMovingDate(movingDateRaw) : null;
+  const customerName = preferCustomerName(
+    contact.name,
+    fallback.name,
+    subjectMatch?.[1]?.trim() ?? null
+  );
+  const customerEmail = contact.email ?? fallback.email;
+  const customerPhone = contact.phone ?? fallback.phone;
+  const movingDate =
+    (movingDateRaw ? parseMovingDate(movingDateRaw) : null) ??
+    extractMoveDateFallback(text);
 
-  const currentPostcode = current.postcode;
+  const currentPostcode = current.postcode ?? postcodeFallback.current;
+  const newPostcode = newAddr.postcode ?? postcodeFallback.delivery;
   const currentArea = extractPostcodeArea(currentPostcode);
 
   let needsReview: string | null = null;
@@ -254,8 +408,8 @@ export function parseCmmLeadText(
       received_at: meta.receivedAt,
       received_date_key: receivedDateKey,
       customer_name: customerName,
-      customer_email: contact.email,
-      customer_phone: contact.phone,
+      customer_email: customerEmail,
+      customer_phone: customerPhone,
       flexible,
       current_address: current.address,
       current_postcode: currentPostcode,
@@ -263,7 +417,7 @@ export function parseCmmLeadText(
       bedrooms: current.bedrooms,
       home_type: current.homeType,
       new_address: newAddr.address,
-      new_postcode: newAddr.postcode,
+      new_postcode: newPostcode,
       additional_services: additionalServices,
       additional_information: additionalInfo,
       number_of_other_companies: numberOfOtherCompanies,
@@ -272,7 +426,7 @@ export function parseCmmLeadText(
       collection_postcode: currentPostcode,
       collection_postcode_area: currentArea,
       delivery_address: newAddr.address,
-      delivery_postcode: newAddr.postcode,
+      delivery_postcode: newPostcode,
       move_date: movingDate ?? movingDateRaw,
       property_size: propertySize,
       external_lead_id: cmmInternalId,

@@ -37,6 +37,170 @@ export const IMVE_DEBUG_FIELD_LABELS: Record<string, ImveMappedField | "status">
   deposit_paid_date: "deposit_paid_at",
 };
 
+const EXACT_BY_FILE_TYPE: Partial<
+  Record<ImveFileType, Partial<Record<ImveMappedField, string[]>>>
+> = {
+  jobs: {
+    job_reference: ["Job Number"],
+    customer_name: ["Client Name"],
+    customer_email: ["Email"],
+    customer_phone: ["Phone"],
+    lead_source: ["Job Source"],
+    job_status: ["Job Status"],
+    move_date: ["Job Move Start Date"],
+    collection_postcode: ["Job Move From Postcode"],
+    delivery_postcode: ["Job Move To Postcode"],
+    deposit_amount: ["Deposit Amount"],
+    invoice_total: ["Invoice Amount"],
+    quote_value: ["Total Amount", "Invoice Amount"],
+  },
+  deposit_invoices: {
+    invoice_total: ["Total"],
+    deposit_amount: ["Deposit Amount", "Total"],
+    job_status: ["Status"],
+    deposit_paid_at: ["Created Date"],
+    customer_name: ["Client Name"],
+    customer_email: ["Email"],
+    customer_phone: ["Phone"],
+    job_reference: ["Job Number"],
+    invoice_reference: ["Invoice Number", "Number"],
+  },
+  job_invoices: {
+    invoice_total: ["Total"],
+    quote_value: ["Total"],
+    job_status: ["Status"],
+    deposit_paid_at: ["Created Date"],
+    customer_name: ["Client Name"],
+    customer_email: ["Email"],
+    customer_phone: ["Phone"],
+    job_reference: ["Job Number"],
+    invoice_reference: ["Invoice Number", "Number"],
+  },
+  custom_invoices: {
+    invoice_total: ["Total"],
+    quote_value: ["Total"],
+    job_status: ["Status"],
+    deposit_paid_at: ["Created Date"],
+    customer_name: ["Client Name"],
+    customer_email: ["Email"],
+    customer_phone: ["Phone"],
+    job_reference: ["Job Number"],
+    invoice_reference: ["Invoice Number", "Number"],
+  },
+};
+
+const BLOCKED_COLUMN_FOR_FIELD: Partial<
+  Record<ImveMappedField, RegExp[]>
+> = {
+  quote_value: [/job\s*name/i, /vat/i],
+  deposit_paid_at: [/job\s*move\s*start/i, /move\s*start/i],
+  move_date: [/job\s*creation/i, /^created$/i],
+  deposit_amount: [/deposit\s*value$/i],
+};
+
+function applyExactMappings(
+  columns: string[],
+  fileType: ImveFileType,
+  used: Set<string>
+): Record<ImveMappedField, string | null> {
+  const mapping = {} as Record<ImveMappedField, string | null>;
+  for (const field of Object.keys(FIELD_RULES) as ImveMappedField[]) {
+    mapping[field] = null;
+  }
+
+  const exact = EXACT_BY_FILE_TYPE[fileType];
+  if (!exact) return mapping;
+
+  const columnLookup = new Map(
+    columns.map((c) => [c.trim().toLowerCase(), c])
+  );
+
+  for (const [field, headers] of Object.entries(exact) as Array<
+    [ImveMappedField, string[]]
+  >) {
+    if (mapping[field]) continue;
+    for (const header of headers) {
+      const col = columnLookup.get(header.toLowerCase());
+      if (!col || used.has(col)) continue;
+      const blocked = BLOCKED_COLUMN_FOR_FIELD[field];
+      if (blocked?.some((re) => re.test(col))) continue;
+      mapping[field] = col;
+      used.add(col);
+      break;
+    }
+  }
+
+  if (fileType === "jobs") {
+    const moveStart = columnLookup.get("job move start date");
+    const jobCreation = columnLookup.get("job creation date");
+    if (moveStart && !mapping.move_date) {
+      mapping.move_date = moveStart;
+      used.add(moveStart);
+    } else if (!mapping.move_date && jobCreation && !moveStart) {
+      mapping.move_date = jobCreation;
+      used.add(jobCreation);
+    }
+  }
+
+  return mapping;
+}
+
+export function validateColumnMapping(
+  mapping: Record<ImveMappedField, string | null>,
+  fileType: ImveFileType,
+  columns: string[],
+  sampleRows: Record<string, string>[] = []
+): string[] {
+  const warnings: string[] = [];
+  const moveStartExists = columns.some(
+    (c) => c.trim().toLowerCase() === "job move start date"
+  );
+
+  for (const [field, column] of Object.entries(mapping) as Array<
+    [ImveMappedField, string | null]
+  >) {
+    if (!column) continue;
+    const blocked = BLOCKED_COLUMN_FOR_FIELD[field];
+    if (blocked?.some((re) => re.test(column))) {
+      warnings.push(`${field} mapped to suspicious column "${column}"`);
+    }
+    if (field === "move_date" && /job\s*creation/i.test(column) && moveStartExists) {
+      warnings.push(
+        `move_date mapped to "${column}" but Job Move Start Date exists — check mapping`
+      );
+    }
+    if (field === "quote_value" && /job\s*name/i.test(column)) {
+      warnings.push(`quote_value mapped to Job Name — this is incorrect`);
+    }
+    if (field === "quote_value" && /vat/i.test(column)) {
+      warnings.push(`quote_value mapped to VAT column — use Total instead`);
+    }
+    if (field === "deposit_amount" && /deposit\s*value$/i.test(column)) {
+      warnings.push(
+        `deposit_amount mapped to Deposit Value (percentage) — use Deposit Amount or Total`
+      );
+    }
+  }
+
+  const totalCol = mapping.invoice_total;
+  if (totalCol && sampleRows.length > 0) {
+    const bad = sampleRows
+      .map((r) => r[totalCol]?.trim())
+      .filter((v) => v && /^no$/i.test(v));
+    if (bad.length > 0) {
+      warnings.push(
+        `invoice_total column "${totalCol}" contains non-numeric values like "No"`
+      );
+    }
+  }
+
+  if (fileType === "unknown") {
+    warnings.push("file type unknown — exact i-MVE column map not applied");
+  }
+
+  return warnings;
+}
+
 const FIELD_RULES: Record<
   ImveMappedField,
   { keys: string[]; patterns: RegExp[] }
@@ -270,6 +434,9 @@ const MONEY = /£|^\d+(\.\d{2})?$/;
 const RR_REF = /\bRR\d+/i;
 
 function scoreColumn(column: string, field: ImveMappedField): number {
+  const blocked = BLOCKED_COLUMN_FOR_FIELD[field];
+  if (blocked?.some((re) => re.test(column))) return 0;
+
   const key = normalizeColumnKey(column);
   const rules = FIELD_RULES[field];
   if (rules.keys.includes(key)) return 100;
@@ -330,7 +497,8 @@ function inferFieldFromValues(
 
 export function resolveColumnMapping(
   columns: string[],
-  sampleRows: Record<string, string>[] = []
+  sampleRows: Record<string, string>[] = [],
+  fileType: ImveFileType = "unknown"
 ): Record<ImveMappedField, string | null> {
   const mapping = {} as Record<ImveMappedField, string | null>;
   const scores = {} as Record<ImveMappedField, number>;
@@ -341,8 +509,17 @@ export function resolveColumnMapping(
     scores[field] = 0;
   }
 
+  const exact = applyExactMappings(columns, fileType, used);
+  for (const field of Object.keys(FIELD_RULES) as ImveMappedField[]) {
+    if (exact[field]) {
+      mapping[field] = exact[field];
+      scores[field] = 100;
+    }
+  }
+
   // Pass 1: header alias / pattern match (exclusive)
   for (const field of Object.keys(FIELD_RULES) as ImveMappedField[]) {
+    if (mapping[field]) continue;
     let best: { column: string; score: number } | null = null;
     for (const column of columns) {
       if (used.has(column)) continue;
@@ -379,9 +556,7 @@ export function resolveColumnMapping(
       const values = sampleRows.map((r) => r[column] ?? "");
       const inferred = inferFieldFromValues(values, column);
       if (!inferred) continue;
-      const existing = mapping[inferred.field];
-      if (existing && scores[inferred.field] >= inferred.score) continue;
-      if (existing) used.delete(existing);
+      if (mapping[inferred.field]) continue;
       mapping[inferred.field] = column;
       scores[inferred.field] = inferred.score;
       used.add(column);
