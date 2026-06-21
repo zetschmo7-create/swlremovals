@@ -10,11 +10,57 @@ import {
 
 type VoiceState = "off" | "listening" | "thinking" | "speaking" | "ready";
 
+type VoiceDebugInfo = {
+  secureContext: boolean;
+  mediaDevicesAvailable: boolean;
+  speechRecognitionAvailable: boolean;
+  lastGetUserMediaResult: string;
+  lastSpeechRecognitionError: string;
+};
+
+const INITIAL_DEBUG: VoiceDebugInfo = {
+  secureContext: false,
+  mediaDevicesAvailable: false,
+  speechRecognitionAvailable: false,
+  lastGetUserMediaResult: "not attempted",
+  lastSpeechRecognitionError: "none",
+};
+
 function getSpeechRecognitionCtor():
   | (new () => SpeechRecognitionInstance)
   | null {
   if (typeof window === "undefined") return null;
   return window.SpeechRecognition ?? window.webkitSpeechRecognition ?? null;
+}
+
+function readDebugSnapshot(): VoiceDebugInfo {
+  if (typeof window === "undefined") return INITIAL_DEBUG;
+  return {
+    secureContext: window.isSecureContext,
+    mediaDevicesAvailable: Boolean(navigator.mediaDevices?.getUserMedia),
+    speechRecognitionAvailable: Boolean(getSpeechRecognitionCtor()),
+    lastGetUserMediaResult: "not attempted",
+    lastSpeechRecognitionError: "none",
+  };
+}
+
+function isMicPermissionDeniedError(error: unknown): boolean {
+  if (error instanceof DOMException) {
+    return (
+      error.name === "NotAllowedError" || error.name === "PermissionDeniedError"
+    );
+  }
+  return false;
+}
+
+function formatGetUserMediaError(error: unknown): string {
+  if (error instanceof DOMException) {
+    return `${error.name}: ${error.message}`;
+  }
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error);
 }
 
 export function VoiceMode({ briefing }: { briefing: JarvisBriefing }) {
@@ -23,8 +69,13 @@ export function VoiceMode({ briefing }: { briefing: JarvisBriefing }) {
   const [finalTranscript, setFinalTranscript] = useState("");
   const [answer, setAnswer] = useState("");
   const [statusNote, setStatusNote] = useState<string | null>(null);
+  const [micPermissionDenied, setMicPermissionDenied] = useState(false);
+  const [speechRecognitionError, setSpeechRecognitionError] = useState<
+    string | null
+  >(null);
   const [ttsError, setTtsError] = useState<string | null>(null);
   const [speechSupported, setSpeechSupported] = useState(false);
+  const [debugInfo, setDebugInfo] = useState<VoiceDebugInfo>(INITIAL_DEBUG);
 
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -57,7 +108,9 @@ export function VoiceMode({ briefing }: { briefing: JarvisBriefing }) {
   }, [clearRestartTimer]);
 
   useEffect(() => {
-    setSpeechSupported(Boolean(getSpeechRecognitionCtor()));
+    const supported = Boolean(getSpeechRecognitionCtor());
+    setSpeechSupported(supported);
+    setDebugInfo(readDebugSnapshot());
   }, []);
 
   const cleanupAudio = useCallback(() => {
@@ -81,6 +134,17 @@ export function VoiceMode({ briefing }: { briefing: JarvisBriefing }) {
     recognitionRef.current = null;
   }, []);
 
+  const clearVoiceErrors = useCallback(() => {
+    setMicPermissionDenied(false);
+    setSpeechRecognitionError(null);
+    setStatusNote(null);
+    setTtsError(null);
+    setDebugInfo((prev) => ({
+      ...prev,
+      lastSpeechRecognitionError: "none",
+    }));
+  }, []);
+
   const stopVoiceMode = useCallback(() => {
     voiceActiveRef.current = false;
     processingRef.current = false;
@@ -91,9 +155,8 @@ export function VoiceMode({ briefing }: { briefing: JarvisBriefing }) {
     cleanupAudio();
     setVoiceState("off");
     setInterimTranscript("");
-    setStatusNote(null);
-    setTtsError(null);
-  }, [cleanupAudio, clearRestartTimer, stopRecognition]);
+    clearVoiceErrors();
+  }, [cleanupAudio, clearRestartTimer, clearVoiceErrors, stopRecognition]);
 
   const stopSpeaking = useCallback(() => {
     speakSessionRef.current += 1;
@@ -205,12 +268,57 @@ export function VoiceMode({ briefing }: { briefing: JarvisBriefing }) {
     [scheduleAutoListen, speakAnswer]
   );
 
+  const requestMicrophoneAccess = useCallback(async (): Promise<boolean> => {
+    setDebugInfo((prev) => ({
+      ...readDebugSnapshot(),
+      lastGetUserMediaResult: "requesting…",
+      lastSpeechRecognitionError: prev.lastSpeechRecognitionError,
+    }));
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      const message = "mediaDevices.getUserMedia is not available";
+      setDebugInfo((prev) => ({
+        ...prev,
+        lastGetUserMediaResult: message,
+      }));
+      setStatusNote(message);
+      return false;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach((track) => track.stop());
+
+      setMicPermissionDenied(false);
+      setDebugInfo((prev) => ({
+        ...prev,
+        lastGetUserMediaResult: "granted (tracks released)",
+      }));
+      return true;
+    } catch (error) {
+      const formatted = formatGetUserMediaError(error);
+      setDebugInfo((prev) => ({
+        ...prev,
+        lastGetUserMediaResult: formatted,
+      }));
+
+      if (isMicPermissionDeniedError(error)) {
+        setMicPermissionDenied(true);
+        return false;
+      }
+
+      setStatusNote(`Microphone access failed: ${formatted}`);
+      return false;
+    }
+  }, []);
+
   const startListening = useCallback(() => {
     const Ctor = getSpeechRecognitionCtor();
     if (!Ctor || !voiceActiveRef.current || processingRef.current) return;
 
     stopRecognition();
     pendingTranscriptRef.current = "";
+    setSpeechRecognitionError(null);
 
     const recognition = new Ctor();
     recognition.lang = "en-GB";
@@ -236,11 +344,27 @@ export function VoiceMode({ briefing }: { briefing: JarvisBriefing }) {
     };
 
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+      if (event.error === "aborted") return;
+
+      const detail = event.message
+        ? `${event.error}: ${event.message}`
+        : event.error;
+
+      setDebugInfo((prev) => ({
+        ...prev,
+        lastSpeechRecognitionError: detail,
+      }));
+
       if (event.error === "no-speech") {
         setStatusNote("No speech detected. Try speaking again.");
-      } else if (event.error !== "aborted") {
-        setStatusNote(`Speech recognition error: ${event.error}`);
+      } else if (event.error === "not-allowed") {
+        setSpeechRecognitionError(
+          "Speech recognition failed: microphone blocked for speech recognition (not getUserMedia)."
+        );
+      } else {
+        setSpeechRecognitionError(`Speech recognition failed: ${detail}`);
       }
+
       if (voiceActiveRef.current && !processingRef.current) {
         setVoiceState("ready");
       }
@@ -265,10 +389,17 @@ export function VoiceMode({ briefing }: { briefing: JarvisBriefing }) {
     setVoiceState("listening");
     setStatusNote(null);
     setTtsError(null);
+
     try {
       recognition.start();
-    } catch {
-      setStatusNote("Could not start microphone. Check browser permissions.");
+    } catch (error) {
+      const detail =
+        error instanceof Error ? error.message : "Could not start recognition";
+      setSpeechRecognitionError(`Speech recognition failed: ${detail}`);
+      setDebugInfo((prev) => ({
+        ...prev,
+        lastSpeechRecognitionError: detail,
+      }));
       setVoiceState("ready");
     }
   }, [processQuestion, scheduleAutoListen, stopRecognition]);
@@ -278,24 +409,29 @@ export function VoiceMode({ briefing }: { briefing: JarvisBriefing }) {
   const startVoiceMode = useCallback(async () => {
     if (!getSpeechRecognitionCtor()) return;
 
-    setStatusNote(null);
-    setTtsError(null);
+    clearVoiceErrors();
     setAnswer("");
     setFinalTranscript("");
     setInterimTranscript("");
     pendingTranscriptRef.current = "";
 
-    try {
-      await navigator.mediaDevices.getUserMedia({ audio: true });
-    } catch {
-      setStatusNote("Microphone permission denied. Allow mic access and try again.");
-      return;
-    }
+    const micOk = await requestMicrophoneAccess();
+    if (!micOk) return;
 
     voiceActiveRef.current = true;
     setVoiceState("ready");
     startListening();
-  }, [startListening]);
+  }, [clearVoiceErrors, requestMicrophoneAccess, startListening]);
+
+  const retryMicrophone = useCallback(() => {
+    if (voiceActiveRef.current) {
+      stopRecognition();
+    } else {
+      voiceActiveRef.current = false;
+    }
+    clearVoiceErrors();
+    void startVoiceMode();
+  }, [clearVoiceErrors, startVoiceMode, stopRecognition]);
 
   useEffect(() => {
     return () => {
@@ -319,6 +455,11 @@ export function VoiceMode({ briefing }: { briefing: JarvisBriefing }) {
             : "Ready";
 
   const displayTranscript = interimTranscript || finalTranscript;
+  const showRetry =
+    micPermissionDenied ||
+    Boolean(speechRecognitionError) ||
+    debugInfo.lastGetUserMediaResult.startsWith("NotAllowed") ||
+    debugInfo.lastGetUserMediaResult.includes("PermissionDenied");
 
   return (
     <div className="jarvis-glass mt-4 rounded-xl border border-violet-500/20 p-5">
@@ -380,9 +521,28 @@ export function VoiceMode({ briefing }: { briefing: JarvisBriefing }) {
             )}
           </>
         )}
+        {showRetry && (
+          <button
+            type="button"
+            onClick={retryMicrophone}
+            className="inline-flex items-center gap-2 rounded-lg border border-violet-500/40 px-4 py-2.5 text-sm text-violet-200 hover:bg-violet-950/40"
+          >
+            <Mic className="h-4 w-4" />
+            Retry microphone
+          </button>
+        )}
       </div>
 
-      {statusNote && (
+      {micPermissionDenied && (
+        <p className="mt-3 text-sm text-amber-300/90">
+          Microphone permission denied. Allow mic access in Chrome site settings and
+          try again.
+        </p>
+      )}
+      {speechRecognitionError && (
+        <p className="mt-3 text-sm text-amber-300/90">{speechRecognitionError}</p>
+      )}
+      {statusNote && !micPermissionDenied && (
         <p className="mt-3 text-sm text-amber-300/90">{statusNote}</p>
       )}
       {ttsError && (
@@ -414,6 +574,17 @@ export function VoiceMode({ briefing }: { briefing: JarvisBriefing }) {
           </p>
         </div>
       )}
+
+      <div className="mt-4 rounded-lg border border-white/5 bg-black/20 p-3 font-mono text-[11px] leading-relaxed text-slate-500">
+        <p>secure context: {debugInfo.secureContext ? "yes" : "no"}</p>
+        <p>mediaDevices available: {debugInfo.mediaDevicesAvailable ? "yes" : "no"}</p>
+        <p>
+          SpeechRecognition available:{" "}
+          {debugInfo.speechRecognitionAvailable ? "yes" : "no"}
+        </p>
+        <p>last getUserMedia result: {debugInfo.lastGetUserMediaResult}</p>
+        <p>last SpeechRecognition error: {debugInfo.lastSpeechRecognitionError}</p>
+      </div>
 
       <p className="mt-4 text-xs text-slate-500">
         Speech-to-text uses your browser (free). Jarvis speaks via ElevenLabs after
