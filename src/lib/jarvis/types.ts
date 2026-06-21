@@ -63,6 +63,8 @@ export type CmmSyncMeta = {
   lastSyncAt: string | null;
   error: string | null;
   debug: CmmSyncDebug;
+  parserVersion?: string;
+  rebuiltAt?: string | null;
 };
 
 export type CmmLeadLedger = {

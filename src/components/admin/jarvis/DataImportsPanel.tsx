@@ -15,6 +15,7 @@ import type {
   ImveRoiEligibilityDebug,
 } from "@/lib/jarvis/imve-types";
 import { formatCurrency, formatPct, Section } from "./jarvis-ui";
+import { TraceLeadPanel } from "./TraceLeadPanel";
 
 const FILE_TYPE_LABELS: Record<string, string> = {
   jobs: "Jobs export",
@@ -330,6 +331,8 @@ export function DataImportsPanel({
         )}
 
         {debug && <ImveImportDebugPanel debug={debug} />}
+
+        <TraceLeadPanel onIntelUpdated={applyIntelResponse} />
 
         {reviewQueue.length > 0 && (
           <div className="mt-6">

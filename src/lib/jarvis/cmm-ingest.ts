@@ -15,6 +15,7 @@ import {
   acquireCmmIngestLock,
   releaseCmmIngestLock,
 } from "./cmm-lead-store";
+import { CMM_PARSER_VERSION } from "./cmm-parser-version";
 import { getJarvisSettings } from "./settings-store";
 import type { CmmLeadLedger, CmmSyncDebug, CmmSyncMeta } from "./types";
 
@@ -168,6 +169,7 @@ async function ingestEmailsUnlocked(
   };
 
   const lastMessageDate = newest?.received_at ?? null;
+  const priorMeta = mode === "sync" ? await getCmmSyncMeta() : null;
   const meta: CmmSyncMeta = {
     messagesScanned: fetchResult.messageIdsReturned,
     leadsParsed: parseSuccesses,
@@ -178,6 +180,8 @@ async function ingestEmailsUnlocked(
     lastSyncAt: now,
     error: null,
     debug,
+    parserVersion: CMM_PARSER_VERSION,
+    rebuiltAt: mode === "rebuild" ? now : priorMeta?.rebuiltAt ?? null,
   };
   await saveCmmSyncMeta(meta);
 

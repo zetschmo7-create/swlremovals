@@ -256,6 +256,49 @@ export async function fetchCmmLabelEmails(options?: {
   };
 }
 
+export async function fetchGmailMessageById(
+  messageId: string
+): Promise<JarvisEmail | null> {
+  const gmail = await getMainGmailClient();
+  if (!gmail) return null;
+
+  const labelMap = await buildLabelMap(gmail);
+  const full = await gmail.users.messages.get({
+    userId: "me",
+    id: messageId,
+    format: "full",
+  });
+  if (!full.data.id) return null;
+  return mapMessage(full.data, labelMap);
+}
+
+export async function searchCmmGmailMessages(
+  query: string,
+  limit = 5
+): Promise<JarvisEmail[]> {
+  const gmail = await getMainGmailClient();
+  if (!gmail) return [];
+
+  const cmmLabel = await resolveCmmLabel(gmail);
+  if (!cmmLabel) return [];
+
+  const labelMap = await buildLabelMap(gmail);
+  const list = await gmail.users.messages.list({
+    userId: "me",
+    labelIds: [cmmLabel.id],
+    q: query,
+    maxResults: limit,
+  });
+
+  const emails: JarvisEmail[] = [];
+  for (const m of list.data.messages ?? []) {
+    if (!m.id) continue;
+    const email = await fetchGmailMessageById(m.id);
+    if (email) emails.push(email);
+  }
+  return emails;
+}
+
 /** @deprecated Use fetchCmmLabelEmails */
 export async function fetchAllCmmLabelEmails(options?: {
   afterDate?: string | null;
