@@ -10,6 +10,56 @@ import {
 
 type VoiceState = "off" | "listening" | "thinking" | "speaking" | "ready";
 
+type TtsPlaybackDebug = {
+  httpStatus: number;
+  contentType: string;
+  blobSize: number;
+  audioUrlCreated: boolean;
+  playError: string | null;
+  mediaErrorCode: string | null;
+};
+
+const INITIAL_TTS_DEBUG: TtsPlaybackDebug = {
+  httpStatus: 0,
+  contentType: "not requested",
+  blobSize: 0,
+  audioUrlCreated: false,
+  playError: null,
+  mediaErrorCode: null,
+};
+
+function mediaErrorLabel(code: number | undefined): string {
+  switch (code) {
+    case MediaError.MEDIA_ERR_ABORTED:
+      return "MEDIA_ERR_ABORTED";
+    case MediaError.MEDIA_ERR_NETWORK:
+      return "MEDIA_ERR_NETWORK";
+    case MediaError.MEDIA_ERR_DECODE:
+      return "MEDIA_ERR_DECODE";
+    case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
+      return "MEDIA_ERR_SRC_NOT_SUPPORTED";
+    default:
+      return code != null ? `MEDIA_ERR_${code}` : "unknown";
+  }
+}
+
+function formatPlayError(error: unknown): string {
+  if (error instanceof DOMException) {
+    return `${error.name}: ${error.message}`;
+  }
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error);
+}
+
+function isAutoplayBlockedError(error: unknown): boolean {
+  return (
+    error instanceof DOMException &&
+    (error.name === "NotAllowedError" || error.name === "AbortError")
+  );
+}
+
 type VoiceDebugInfo = {
   secureContext: boolean;
   mediaDevicesAvailable: boolean;
@@ -160,6 +210,12 @@ export function VoiceMode({ briefing }: { briefing: JarvisBriefing }) {
   >(null);
   const [ttsError, setTtsError] = useState<string | null>(null);
   const [ttsTesting, setTtsTesting] = useState(false);
+  const [ttsPlaybackDebug, setTtsPlaybackDebug] =
+    useState<TtsPlaybackDebug>(INITIAL_TTS_DEBUG);
+  const [lastAudioReady, setLastAudioReady] = useState(false);
+  const [lastAudioDownloadUrl, setLastAudioDownloadUrl] = useState<string | null>(
+    null
+  );
   const [speechSupported, setSpeechSupported] = useState(false);
   const [debugInfo, setDebugInfo] = useState<VoiceDebugInfo>(INITIAL_DEBUG);
   const [rawMicTesting, setRawMicTesting] = useState(false);
@@ -167,6 +223,8 @@ export function VoiceMode({ briefing }: { briefing: JarvisBriefing }) {
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
+  const lastAudioBlobRef = useRef<Blob | null>(null);
+  const lastAudioUrlRef = useRef<string | null>(null);
   const voiceActiveRef = useRef(false);
   const processingRef = useRef(false);
   const pendingTranscriptRef = useRef("");
@@ -216,16 +274,34 @@ export function VoiceMode({ briefing }: { briefing: JarvisBriefing }) {
     void refreshEnvironmentDebug();
   }, [refreshEnvironmentDebug]);
 
-  const cleanupAudio = useCallback(() => {
+  const releaseActivePlayback = useCallback(() => {
     if (audioRef.current) {
+      audioRef.current.onended = null;
+      audioRef.current.onerror = null;
       audioRef.current.pause();
-      audioRef.current.src = "";
+      audioRef.current.removeAttribute("src");
+      audioRef.current.load();
       audioRef.current = null;
     }
     if (objectUrlRef.current) {
       URL.revokeObjectURL(objectUrlRef.current);
       objectUrlRef.current = null;
     }
+  }, []);
+
+  const cleanupAudio = releaseActivePlayback;
+
+  const rememberLastAudio = useCallback((blob: Blob, url: string) => {
+    if (
+      lastAudioUrlRef.current &&
+      lastAudioUrlRef.current !== objectUrlRef.current
+    ) {
+      URL.revokeObjectURL(lastAudioUrlRef.current);
+    }
+    lastAudioBlobRef.current = blob;
+    lastAudioUrlRef.current = url;
+    setLastAudioDownloadUrl(url);
+    setLastAudioReady(true);
   }, []);
 
   const stopRecognition = useCallback(() => {
@@ -270,71 +346,206 @@ export function VoiceMode({ briefing }: { briefing: JarvisBriefing }) {
     }
   }, [cleanupAudio]);
 
-  const playTtsBlob = useCallback(
-    async (blob: Blob, sessionId: number): Promise<void> => {
-      const url = URL.createObjectURL(blob);
-      objectUrlRef.current = url;
-
-      const audio = new Audio(url);
-      audioRef.current = audio;
-
-      await new Promise<void>((resolve, reject) => {
-        const finish = () => {
-          if (sessionId !== speakSessionRef.current) {
-            resolve();
-            return;
-          }
-          resolve();
-        };
-        audio.onended = finish;
-        audio.onerror = () => {
-          if (sessionId !== speakSessionRef.current) {
-            resolve();
-            return;
-          }
-          reject(new Error("Audio playback failed"));
-        };
-        void audio.play().catch((err) => {
-          if (sessionId !== speakSessionRef.current) {
-            resolve();
-            return;
-          }
-          reject(err);
-        });
-      });
-    },
-    []
-  );
-
   const requestTts = useCallback(
-    async (payload: { text?: string; test?: boolean }): Promise<Blob> => {
+    async (
+      payload: { text?: string; test?: boolean }
+    ): Promise<{ blob: Blob; debug: TtsPlaybackDebug }> => {
       const res = await fetch("/api/jarvis/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
+      const contentType = res.headers.get("content-type") ?? "unknown";
+      const debug: TtsPlaybackDebug = {
+        httpStatus: res.status,
+        contentType,
+        blobSize: 0,
+        audioUrlCreated: false,
+        playError: null,
+        mediaErrorCode: null,
+      };
+
       if (!res.ok) {
         const json = (await res.json().catch(() => ({}))) as { error?: string };
         throw new Error(json.error ?? `ElevenLabs TTS failed (${res.status})`);
       }
 
-      return res.blob();
+      const blob = await res.blob();
+      debug.blobSize = blob.size;
+      setTtsPlaybackDebug(debug);
+
+      if (blob.size === 0) {
+        throw new Error("TTS returned empty audio blob (0 bytes)");
+      }
+
+      if (contentType.includes("application/json")) {
+        const text = await blob.text();
+        throw new Error(
+          `Expected audio/mpeg but received JSON: ${text.slice(0, 240)}`
+        );
+      }
+
+      return { blob, debug };
     },
     []
   );
+
+  const playAudioBlob = useCallback(
+    async (
+      blob: Blob,
+      sessionId: number,
+      fetchDebug: TtsPlaybackDebug
+    ): Promise<void> => {
+      releaseActivePlayback();
+
+      const url = URL.createObjectURL(blob);
+      objectUrlRef.current = url;
+      rememberLastAudio(blob, url);
+
+      const playbackDebug: TtsPlaybackDebug = {
+        ...fetchDebug,
+        audioUrlCreated: true,
+        playError: null,
+        mediaErrorCode: null,
+      };
+      setTtsPlaybackDebug(playbackDebug);
+
+      const audio = new Audio();
+      audio.preload = "auto";
+      audio.src = url;
+      audioRef.current = audio;
+
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error("Audio load timeout after 15s"));
+        }, 15000);
+
+        const fail = (message: string, mediaCode?: number) => {
+          clearTimeout(timeout);
+          playbackDebug.playError = message;
+          playbackDebug.mediaErrorCode =
+            mediaCode != null ? mediaErrorLabel(mediaCode) : null;
+          setTtsPlaybackDebug({ ...playbackDebug });
+          reject(new Error(message));
+        };
+
+        audio.onloadeddata = () => {
+          clearTimeout(timeout);
+          resolve();
+        };
+        audio.onerror = () => {
+          const mediaError = audio.error;
+          fail(
+            `Audio element error: ${mediaErrorLabel(mediaError?.code)}${
+              mediaError?.message ? ` — ${mediaError.message}` : ""
+            }`,
+            mediaError?.code
+          );
+        };
+      });
+
+      try {
+        await audio.play();
+      } catch (error) {
+        const playMessage = formatPlayError(error);
+        playbackDebug.playError = playMessage;
+        setTtsPlaybackDebug({ ...playbackDebug });
+
+        if (isAutoplayBlockedError(error)) {
+          throw new Error("Browser blocked autoplay — click Play audio.");
+        }
+        throw new Error(`audio.play() failed: ${playMessage}`);
+      }
+
+      await new Promise<void>((resolve, reject) => {
+        audio.onended = () => resolve();
+        audio.onerror = () => {
+          const mediaError = audio.error;
+          reject(
+            new Error(
+              `Audio playback interrupted: ${mediaErrorLabel(mediaError?.code)}`
+            )
+          );
+        };
+      });
+
+      if (sessionId !== speakSessionRef.current) return;
+
+      releaseActivePlayback();
+    },
+    [rememberLastAudio, releaseActivePlayback]
+  );
+
+  const playLastAudio = useCallback(async () => {
+    const blob = lastAudioBlobRef.current;
+
+    if (!blob) {
+      setTtsError("No audio blob available to play.");
+      return;
+    }
+
+    if (
+      lastAudioUrlRef.current &&
+      lastAudioUrlRef.current !== objectUrlRef.current
+    ) {
+      URL.revokeObjectURL(lastAudioUrlRef.current);
+    }
+
+    const url = URL.createObjectURL(blob);
+    lastAudioUrlRef.current = url;
+    setLastAudioDownloadUrl(url);
+
+    releaseActivePlayback();
+    objectUrlRef.current = url;
+
+    const audio = new Audio(url);
+    audioRef.current = audio;
+
+    try {
+      await audio.play();
+      setTtsError(null);
+      setStatusNote("Playing last TTS audio.");
+      audio.onended = () => {
+        if (objectUrlRef.current === url) {
+          releaseActivePlayback();
+        }
+      };
+    } catch (error) {
+      const playMessage = formatPlayError(error);
+      setTtsPlaybackDebug((prev) => ({
+        ...prev,
+        playError: playMessage,
+      }));
+      if (isAutoplayBlockedError(error)) {
+        setTtsError("Browser blocked autoplay — click Play audio.");
+      } else {
+        setTtsError(`audio.play() failed: ${playMessage}`);
+      }
+    }
+  }, [releaseActivePlayback]);
+
+  const openLastAudio = useCallback(() => {
+    const url = lastAudioUrlRef.current;
+    if (!url) {
+      setTtsError("No audio URL available to open.");
+      return;
+    }
+    window.open(url, "_blank", "noopener,noreferrer");
+  }, []);
 
   const testElevenLabsTts = useCallback(async () => {
     const sessionId = speakSessionRef.current + 1;
     speakSessionRef.current = sessionId;
     setTtsTesting(true);
     setTtsError(null);
-    cleanupAudio();
+    setTtsPlaybackDebug(INITIAL_TTS_DEBUG);
+    releaseActivePlayback();
 
     try {
-      const blob = await requestTts({ test: true });
+      const { blob, debug } = await requestTts({ test: true });
       if (sessionId !== speakSessionRef.current) return;
-      await playTtsBlob(blob, sessionId);
+      await playAudioBlob(blob, sessionId, debug);
       setStatusNote("ElevenLabs test playback succeeded.");
     } catch (error) {
       if (sessionId !== speakSessionRef.current) return;
@@ -342,40 +553,40 @@ export function VoiceMode({ briefing }: { briefing: JarvisBriefing }) {
         error instanceof Error ? error.message : "ElevenLabs test failed";
       setTtsError(message);
     } finally {
-      if (sessionId === speakSessionRef.current) {
-        cleanupAudio();
-      }
       setTtsTesting(false);
     }
-  }, [cleanupAudio, playTtsBlob, requestTts]);
+  }, [playAudioBlob, releaseActivePlayback, requestTts]);
 
   const speakAnswer = useCallback(
     async (text: string): Promise<void> => {
       const sessionId = speakSessionRef.current + 1;
       speakSessionRef.current = sessionId;
 
-      cleanupAudio();
+      releaseActivePlayback();
       setTtsError(null);
       setVoiceState("speaking");
 
       try {
-        const blob = await requestTts({ text: trimForTts(text) });
+        const { blob, debug } = await requestTts({ text: trimForTts(text) });
 
         if (sessionId !== speakSessionRef.current) return;
 
-        await playTtsBlob(blob, sessionId);
+        await playAudioBlob(blob, sessionId, debug);
       } catch (error) {
         if (sessionId !== speakSessionRef.current) return;
         const message =
           error instanceof Error ? error.message : "Voice playback failed";
         setTtsError(message);
+        if (message.includes("click Play audio") && lastAudioBlobRef.current) {
+          setStatusNote("Audio fetched — use Play last response audio.");
+        }
       } finally {
-        if (sessionId === speakSessionRef.current) {
-          cleanupAudio();
+        if (sessionId === speakSessionRef.current && voiceActiveRef.current) {
+          setVoiceState("ready");
         }
       }
     },
-    [cleanupAudio, playTtsBlob, requestTts]
+    [playAudioBlob, releaseActivePlayback, requestTts]
   );
 
   const processQuestion = useCallback(
@@ -670,9 +881,15 @@ export function VoiceMode({ briefing }: { briefing: JarvisBriefing }) {
       speakSessionRef.current += 1;
       clearRestartTimer();
       stopRecognition();
-      cleanupAudio();
+      releaseActivePlayback();
+      if (
+        lastAudioUrlRef.current &&
+        lastAudioUrlRef.current !== objectUrlRef.current
+      ) {
+        URL.revokeObjectURL(lastAudioUrlRef.current);
+      }
     };
-  }, [cleanupAudio, clearRestartTimer, stopRecognition]);
+  }, [clearRestartTimer, releaseActivePlayback, stopRecognition]);
 
   const primaryLabel =
     voiceState === "off"
@@ -771,6 +988,34 @@ export function VoiceMode({ briefing }: { briefing: JarvisBriefing }) {
           <Volume2 className="h-4 w-4" />
           {ttsTesting ? "Testing TTS…" : "Test ElevenLabs TTS"}
         </button>
+        {lastAudioReady && (
+          <>
+            <button
+              type="button"
+              onClick={() => void playLastAudio()}
+              className="inline-flex items-center gap-2 rounded-lg border border-violet-500/40 px-4 py-2.5 text-sm text-violet-200 hover:bg-violet-950/40"
+            >
+              <Volume2 className="h-4 w-4" />
+              Play last response audio
+            </button>
+            <button
+              type="button"
+              onClick={openLastAudio}
+              className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-4 py-2.5 text-sm text-slate-300 hover:bg-white/5"
+            >
+              Open audio blob
+            </button>
+            {lastAudioDownloadUrl && (
+              <a
+                href={lastAudioDownloadUrl}
+                download="jarvis-tts.mp3"
+                className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-4 py-2.5 text-sm text-slate-300 hover:bg-white/5"
+              >
+                Download test audio
+              </a>
+            )}
+          </>
+        )}
         {showRetry && (
           <button
             type="button"
@@ -809,6 +1054,26 @@ export function VoiceMode({ briefing }: { briefing: JarvisBriefing }) {
           <p className="mt-2 text-xs text-red-300/70">
             Text answer is still shown below.
           </p>
+        </div>
+      )}
+
+      {ttsPlaybackDebug.httpStatus > 0 && (
+        <div className="mt-3 rounded-lg border border-white/5 bg-black/20 p-3 font-mono text-[11px] leading-relaxed text-slate-500">
+          <p className="mb-1 text-xs uppercase tracking-widest text-slate-500">
+            TTS playback debug
+          </p>
+          <p>HTTP status: {ttsPlaybackDebug.httpStatus}</p>
+          <p>content-type: {ttsPlaybackDebug.contentType}</p>
+          <p>blob size: {ttsPlaybackDebug.blobSize} bytes</p>
+          <p>
+            audio URL created: {ttsPlaybackDebug.audioUrlCreated ? "yes" : "no"}
+          </p>
+          <p>
+            play error: {ttsPlaybackDebug.playError ?? "none"}
+          </p>
+          {ttsPlaybackDebug.mediaErrorCode && (
+            <p>media error: {ttsPlaybackDebug.mediaErrorCode}</p>
+          )}
         </div>
       )}
 

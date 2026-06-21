@@ -47,10 +47,17 @@ export async function POST(request: Request) {
 
   try {
     const audio = await synthesizeElevenLabsSpeech(text);
+    if (audio.length === 0) {
+      return NextResponse.json(
+        { error: "ElevenLabs returned empty audio bytes" },
+        { status: 502 }
+      );
+    }
     return new NextResponse(new Uint8Array(audio), {
       status: 200,
       headers: {
         "Content-Type": "audio/mpeg",
+        "Content-Length": String(audio.length),
         "Cache-Control": "no-store",
       },
     });

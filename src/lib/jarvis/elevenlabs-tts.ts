@@ -158,6 +158,11 @@ export async function synthesizeElevenLabsSpeech(text: string): Promise<Buffer> 
     const result = await requestElevenLabsTts(apiKey, voiceId, trimmed, modelId);
 
     if (result.ok) {
+      if (result.audio.length === 0) {
+        lastStatus = 502;
+        lastBody = "ElevenLabs returned empty audio bytes";
+        break;
+      }
       return result.audio;
     }
 
