@@ -154,9 +154,9 @@ export function CmmLeadIntelligencePanel({
       subtitle="Source: Gmail label “CMM - New Lead” on info@ryanremovals.com"
     >
       {data.imveImportSummary?.usingImveForRoi && (
-        <div className="jarvis-glass mb-4 rounded-xl border border-emerald-500/25 bg-emerald-500/10 p-4 text-sm text-emerald-200">
-          Area ROI uses matched i-MVE data ({data.imveImportSummary.depositPaidCount}{" "}
-          deposit-paid jobs from import).
+        <div className="jarvis-glass mb-4 rounded-xl border border-slate-500/25 bg-slate-500/10 p-4 text-sm text-slate-300">
+          CMM match diagnostics below — primary won-job and ROI metrics are in
+          Commercial Intelligence (i-MVE first).
         </div>
       )}
 

@@ -1,5 +1,6 @@
 import type { PdfParseResult, PdfParseStatus } from "./pdf-parser";
 import type { OperationalPdfCategory } from "./pdf-whitelist";
+import type { CommercialIntelligence } from "./commercial-intelligence-types";
 
 export type JarvisAccount = "main" | "appointments";
 
@@ -619,6 +620,7 @@ export type JarvisBriefing = {
     label: string;
   };
   cmmLeadIntelligence: CmmLeadIntelligence;
+  commercialIntelligence: CommercialIntelligence;
 };
 
 export type PdfDiagnosticEntry = {

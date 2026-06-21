@@ -180,6 +180,12 @@ export function applyInvoicesToJobsWithLinking(
         /paid|complete|received/i.test(
           (inv.raw.Status ?? inv.raw.status ?? "").toString()
         );
+      const invNumber =
+        inv.invoice_id ??
+        (inv.raw["Invoice Number"] ?? inv.raw["Number"] ?? "").toString();
+      if (invNumber && invNumber !== `deposit-${inv.invoice_id}`) {
+        job.deposit_invoice_number = invNumber;
+      }
       if (paid) {
         job.deposit_paid = true;
         job.deposit_paid_at =
@@ -191,6 +197,7 @@ export function applyInvoicesToJobsWithLinking(
     }
 
     if (inv.invoice_type === "job" && inv.amount != null) {
+      job.invoice_amount = inv.amount;
       job.turnover = inv.amount;
       if (inv.paid) job.booked = true;
     }

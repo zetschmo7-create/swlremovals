@@ -83,6 +83,10 @@ export function normalizeImveJobs(
     const email =
       pickMappedField(row, mapping, "customer_email")?.toLowerCase() ?? null;
     const phoneRaw = pickMappedField(row, mapping, "customer_phone");
+    const totalAmount = parseMoney(pickMappedField(row, mapping, "total_amount"));
+    const invoiceAmount = parseMoney(
+      pickMappedField(row, mapping, "invoice_amount")
+    );
 
     return {
       imve_id: jobIdFromRow(row, mapping, index),
@@ -90,18 +94,24 @@ export function normalizeImveJobs(
       customer_name: pickMappedField(row, mapping, "customer_name"),
       customer_email: email,
       customer_phone: phoneRaw ? (normalizePhone(phoneRaw) ?? phoneRaw) : null,
+      job_creation_date: parseDate(
+        pickMappedField(row, mapping, "job_creation_date")
+      ),
       move_date: parseDate(pickMappedField(row, mapping, "move_date")),
       from_postcode: fromPostcode,
       to_postcode: pickMappedField(row, mapping, "delivery_postcode"),
       from_area: extractPostcodeArea(fromPostcode),
       lead_source: pickMappedField(row, mapping, "lead_source"),
       status,
-      quote_value: parseMoney(
-        pickMappedField(row, mapping, "quote_value") ??
-          pickMappedField(row, mapping, "invoice_total")
-      ),
+      quote_value: totalAmount ?? parseMoney(pickMappedField(row, mapping, "quote_value")),
+      total_amount: totalAmount,
+      invoice_amount: invoiceAmount,
+      invoice_number: pickMappedField(row, mapping, "invoice_number"),
+      invoice_status: pickMappedField(row, mapping, "invoice_status"),
+      deposit_invoice_number: pickMappedField(row, mapping, "deposit_invoice_number"),
+      deposit_status: pickMappedField(row, mapping, "deposit_status"),
       booked:
-        /booked|confirmed|deposit|paid|complete/i.test(status ?? "") ||
+        /booked|confirmed|deposit|paid|complete|accepted/i.test(status ?? "") ||
         /booked|confirmed/i.test(bookingStatus ?? "") ||
         depositPaid,
       deposit_paid: depositPaid,
@@ -109,7 +119,10 @@ export function normalizeImveJobs(
         ? parseDate(pickMappedField(row, mapping, "deposit_paid_at"))
         : null,
       deposit_amount: parseMoney(pickMappedField(row, mapping, "deposit_amount")),
-      turnover: parseMoney(pickMappedField(row, mapping, "invoice_total")),
+      turnover:
+        totalAmount ??
+        invoiceAmount ??
+        parseMoney(pickMappedField(row, mapping, "invoice_total")),
       commission: null,
       source_file_hash: fileHash,
       updated_at: now,
@@ -263,9 +276,17 @@ export function mergeImveJobs(
         customer_email: job.customer_email ?? prev.customer_email,
         customer_phone: job.customer_phone ?? prev.customer_phone,
         customer_name: job.customer_name ?? prev.customer_name,
+        job_creation_date: job.job_creation_date ?? prev.job_creation_date,
         deposit_paid: job.deposit_paid || prev.deposit_paid,
         deposit_paid_at: job.deposit_paid_at ?? prev.deposit_paid_at,
         deposit_amount: job.deposit_amount ?? prev.deposit_amount,
+        deposit_invoice_number:
+          job.deposit_invoice_number ?? prev.deposit_invoice_number,
+        deposit_status: job.deposit_status ?? prev.deposit_status,
+        total_amount: job.total_amount ?? prev.total_amount,
+        invoice_amount: job.invoice_amount ?? prev.invoice_amount,
+        invoice_number: job.invoice_number ?? prev.invoice_number,
+        invoice_status: job.invoice_status ?? prev.invoice_status,
         turnover: job.turnover ?? prev.turnover,
         quote_value: job.quote_value ?? prev.quote_value,
         updated_at: job.updated_at,

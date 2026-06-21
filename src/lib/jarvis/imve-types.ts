@@ -25,6 +25,7 @@ export type ImveJobRecord = {
   customer_name: string | null;
   customer_email: string | null;
   customer_phone: string | null;
+  job_creation_date: string | null;
   move_date: string | null;
   from_postcode: string | null;
   to_postcode: string | null;
@@ -32,6 +33,12 @@ export type ImveJobRecord = {
   lead_source: string | null;
   status: string | null;
   quote_value: number | null;
+  total_amount: number | null;
+  invoice_amount: number | null;
+  invoice_number: string | null;
+  invoice_status: string | null;
+  deposit_invoice_number: string | null;
+  deposit_status: string | null;
   booked: boolean;
   deposit_paid: boolean;
   deposit_paid_at: string | null;

@@ -9,11 +9,18 @@ export type ImveMappedField =
   | "collection_postcode"
   | "delivery_postcode"
   | "move_date"
+  | "job_creation_date"
   | "job_status"
   | "booking_status"
   | "quote_value"
+  | "total_amount"
+  | "invoice_amount"
   | "invoice_total"
+  | "invoice_number"
+  | "invoice_status"
   | "deposit_amount"
+  | "deposit_invoice_number"
+  | "deposit_status"
   | "deposit_paid_at"
   | "job_reference"
   | "quote_reference"
@@ -47,12 +54,19 @@ const EXACT_BY_FILE_TYPE: Partial<
     customer_phone: ["Phone"],
     lead_source: ["Job Source"],
     job_status: ["Job Status"],
+    job_creation_date: ["Job Creation Date"],
     move_date: ["Job Move Start Date"],
     collection_postcode: ["Job Move From Postcode"],
     delivery_postcode: ["Job Move To Postcode"],
+    deposit_invoice_number: ["Deposit Invoice Number"],
     deposit_amount: ["Deposit Amount"],
-    invoice_total: ["Invoice Amount"],
-    quote_value: ["Total Amount", "Invoice Amount"],
+    deposit_status: ["Deposit Status"],
+    invoice_number: ["Invoice Number"],
+    invoice_amount: ["Invoice Amount"],
+    total_amount: ["Total Amount"],
+    invoice_status: ["Invoice Status"],
+    invoice_total: ["Invoice Amount", "Total Amount"],
+    quote_value: ["Total Amount"],
   },
   deposit_invoices: {
     invoice_total: ["Total"],
@@ -300,6 +314,10 @@ const FIELD_RULES: Record<
     ],
     patterns: [/move.*date/i, /moving.*date/i, /job.*date/i, /removal.*date/i],
   },
+  job_creation_date: {
+    keys: ["job_creation_date", "created_date", "creation_date", "date_created"],
+    patterns: [/job.*creation/i, /creation.*date/i, /created.*date/i],
+  },
   job_status: {
     keys: ["status", "job_status", "current_status", "state", "job_state"],
     patterns: [/job.*status/i, /^status$/i, /current_status/i, /job_state/i],
@@ -320,6 +338,14 @@ const FIELD_RULES: Record<
       "estimate",
     ],
     patterns: [/quote/i, /quoted/i, /estimate/i],
+  },
+  total_amount: {
+    keys: ["total_amount", "job_total", "grand_total", "move_total"],
+    patterns: [/total\s*amount/i, /^total$/i, /grand.*total/i],
+  },
+  invoice_amount: {
+    keys: ["invoice_amount", "invoice_value", "billed_amount"],
+    patterns: [/invoice.*amount/i, /invoice.*value/i],
   },
   invoice_total: {
     keys: [
@@ -344,6 +370,14 @@ const FIELD_RULES: Record<
       /price/i,
     ],
   },
+  invoice_number: {
+    keys: ["invoice_number", "invoice_no", "invoice_id"],
+    patterns: [/invoice.*number/i, /invoice.*no/i, /^invoice$/i],
+  },
+  invoice_status: {
+    keys: ["invoice_status", "invoice_state"],
+    patterns: [/invoice.*status/i],
+  },
   deposit_amount: {
     keys: [
       "deposit_amount",
@@ -354,6 +388,14 @@ const FIELD_RULES: Record<
       "deposit_paid_amount",
     ],
     patterns: [/deposit/i, /amount_paid/i],
+  },
+  deposit_invoice_number: {
+    keys: ["deposit_invoice_number", "deposit_invoice_no", "deposit_inv_number"],
+    patterns: [/deposit.*invoice.*number/i, /deposit.*invoice.*no/i],
+  },
+  deposit_status: {
+    keys: ["deposit_status", "deposit_state"],
+    patterns: [/deposit.*status/i],
   },
   deposit_paid_at: {
     keys: [

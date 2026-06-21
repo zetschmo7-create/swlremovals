@@ -14,6 +14,7 @@ import { JarvisAssistant } from "./JarvisAssistant";
 import { DataQualityPanel } from "./LedgerPanels";
 import { CmmLeadIntelligencePanel } from "./CmmLeadIntelligence";
 import { DataImportsPanel } from "./DataImportsPanel";
+import { CommercialIntelligencePanel } from "./CommercialIntelligencePanel";
 
 const BUCKET_LABELS: Record<TaskBucket, string> = {
   jarvis: "AutoPilot",
@@ -319,6 +320,8 @@ export function JarvisHomeView({
         onCmmIntelUpdated={handleCmmIntelUpdated}
         onRefresh={onRefresh}
       />
+
+      <CommercialIntelligencePanel briefing={activeBriefing} />
 
       <CmmLeadIntelligencePanel briefing={activeBriefing} onRefresh={onRefresh} />
 

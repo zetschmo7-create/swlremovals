@@ -13,6 +13,10 @@ import {
   loadCmmLeadIntelligence,
   cmmSpendFromIntelligence,
 } from "./cmm-analytics";
+import { buildCommercialIntelligence } from "./commercial-intelligence";
+import { getCmmLeadLedger } from "./cmm-lead-store";
+import { getImveImportLedgerOrEmpty } from "./imve-store";
+import { getImveCmmMatchLedger } from "./imve-cmm-match-store";
 import {
   buildCommissionForecastFromLedger,
   buildDataQuality,
@@ -210,6 +214,16 @@ export async function generateJarvisBriefing(): Promise<JarvisBriefing> {
   const postcodeAnalytics = buildPostcodeAnalytics(jobs, settings, 30);
   const cmmLeadIntelligence = await loadCmmLeadIntelligence(settings);
   const cmmSpend = cmmSpendFromIntelligence(cmmLeadIntelligence);
+  const cmmLedger = await getCmmLeadLedger();
+  const imveLedger = await getImveImportLedgerOrEmpty();
+  const imveMatchLedger = await getImveCmmMatchLedger();
+  const commercialIntelligence = buildCommercialIntelligence(
+    imveLedger.jobs,
+    cmmLedger?.leads ?? [],
+    settings,
+    imveMatchLedger?.matches,
+    { unlinkedDepositCount: imveLedger.unlinked_deposit_count }
+  );
   const gmailConnected =
     (gmailStatus.main.connected ? 1 : 0) + (gmailStatus.appointments.connected ? 1 : 0);
   const dataQuality = buildDataQuality(
@@ -331,6 +345,7 @@ export async function generateJarvisBriefing(): Promise<JarvisBriefing> {
     postcodeAnalytics,
     cmmSpend,
     cmmLeadIntelligence,
+    commercialIntelligence,
   };
 
   const { script, focus } = buildExecutiveBriefing(briefingBase);
