@@ -28,6 +28,10 @@ import { isImveMatchUsableForRoi } from "./imve-cmm-match";
 import { imveJobToJobRecord } from "./imve-to-job";
 import type { ImveCmmLeadMatch, ImveJobRecord } from "./imve-types";
 import { buildCmmCompletenessStats } from "./cmm-completeness";
+import {
+  evaluateImveMatchForRoi,
+  imveRoiMetricsFromEvaluations,
+} from "./imve-roi-debug";
 
 const ALL_AREAS: PostcodeArea[] = ["GU", "RH", "TN", "SM", "CR", "Other", "Unknown"];
 
@@ -147,8 +151,11 @@ function collectImveMatchedJobsForArea(
     const imveJob = jobById.get(match.imve_job_id);
     if (!imveJob) continue;
 
-    const hasDeposit = match.deposit_paid || imveJob.deposit_paid;
-    const hasValue = (imveJob.turnover ?? imveJob.quote_value) != null;
+    const hasDeposit =
+      match.deposit_paid ||
+      imveJob.deposit_paid ||
+      (imveJob.deposit_amount ?? 0) > 0;
+    const hasValue = (imveJob.turnover ?? imveJob.quote_value ?? 0) > 0;
     if (!hasDeposit && !hasValue) continue;
 
     const job = imveJobToJobRecord(imveJob);
@@ -182,33 +189,48 @@ function buildAreaAnalytics(
   const thisMonth = countIn((l) => inThisMonth(l, now));
   const allTime = areaLeads.length;
 
-  const matchedJobs =
-    useImveRoi && imveMatches
-      ? collectImveMatchedJobsForArea(areaLeads, imveMatches, imveJobs)
-      : collectMatchedJobsForArea(areaLeads, matches, jobs);
-
-  const depositsPaid =
-    useImveRoi && imveMatches
-      ? areaLeads.filter((l) => {
-          const m = imveMatches[l.gmail_message_id];
-          return isImveMatchUsableForRoi(m) && m?.deposit_paid;
-        }).length
-      : matchedJobs.filter((j) => j.deposit_receipt_received_at).length;
-  const turnover = matchedJobs
-    .filter((j) => j.deposit_receipt_received_at)
-    .reduce((s, j) => s + (j.final_move_value ?? j.quote_value ?? 0), 0);
-  const commission = matchedJobs
-    .filter((j) => j.commission_payable)
-    .reduce((s, j) => s + (j.commission_value ?? 0), 0);
-
-  const conversionRate =
-    allTime > 0 && depositsPaid > 0 ? depositsPaid / allTime : null;
-
   const spendAll = allTime * cost;
-  const roi =
-    conversionRate != null && spendAll > 0
-      ? (turnover - spendAll) / spendAll
-      : null;
+
+  let depositsPaid: number;
+  let turnover: number;
+  let commission: number;
+  let conversionRate: number | null;
+  let roi: number | null;
+
+  if (useImveRoi && imveMatches) {
+    const jobById = new Map(imveJobs.map((j) => [j.imve_id, j]));
+    const evaluations = areaLeads.map((lead) =>
+      evaluateImveMatchForRoi(
+        lead,
+        imveMatches[lead.gmail_message_id],
+        jobById.get(imveMatches[lead.gmail_message_id]?.imve_job_id ?? "")
+      )
+    );
+    const metrics = imveRoiMetricsFromEvaluations(evaluations);
+    depositsPaid = metrics.depositsPaid;
+    turnover = metrics.turnover;
+    commission = metrics.commission;
+    conversionRate =
+      allTime > 0 && depositsPaid > 0 ? depositsPaid / allTime : null;
+    roi =
+      spendAll > 0 && turnover > 0 ? (turnover - spendAll) / spendAll : null;
+  } else {
+    const matchedJobs = collectMatchedJobsForArea(areaLeads, matches, jobs);
+    depositsPaid = matchedJobs.filter((j) => j.deposit_receipt_received_at)
+      .length;
+    turnover = matchedJobs
+      .filter((j) => j.deposit_receipt_received_at)
+      .reduce((s, j) => s + (j.final_move_value ?? j.quote_value ?? 0), 0);
+    commission = matchedJobs
+      .filter((j) => j.commission_payable)
+      .reduce((s, j) => s + (j.commission_value ?? 0), 0);
+    conversionRate =
+      allTime > 0 && depositsPaid > 0 ? depositsPaid / allTime : null;
+    roi =
+      conversionRate != null && spendAll > 0
+        ? (turnover - spendAll) / spendAll
+        : null;
+  }
 
   const needsReviewLeads = areaLeads.filter((l) => {
     const leadId = l.gmail_message_id;

@@ -12,8 +12,9 @@ import type {
   ImveFilePreview,
   ImveImportDebug,
   ImveImportPreviewSession,
+  ImveRoiEligibilityDebug,
 } from "@/lib/jarvis/imve-types";
-import { Section } from "./jarvis-ui";
+import { formatCurrency, formatPct, Section } from "./jarvis-ui";
 
 const FILE_TYPE_LABELS: Record<string, string> = {
   jobs: "Jobs export",
@@ -574,6 +575,183 @@ function FileMappingDebugCard({ file }: { file: ImveFileMappingDebug }) {
   );
 }
 
+function ImveRoiEligibilitySection({ roi }: { roi: ImveRoiEligibilityDebug }) {
+  const t = roi.totals;
+  const reasonLabels: Record<string, string> = {
+    no_match: "No CMM match record",
+    status_needs_review: "Needs review — approve to include in ROI",
+    status_rejected: "Rejected",
+    status_unmatched: "Unmatched",
+    status_not_eligible: "Match status not eligible (must be auto_matched or approved)",
+    missing_imve_job_id: "No linked i-MVE job id",
+    imve_job_not_found: "Linked i-MVE job not found in import ledger",
+    no_deposit_or_value: "No deposit paid and no turnover/quote value on job",
+  };
+
+  return (
+    <div>
+      <p className="mb-2 text-xs uppercase tracking-widest text-slate-500">
+        5. ROI eligibility (CMM area table handoff)
+      </p>
+      {!roi.using_imve_for_roi && (
+        <p className="mb-2 text-xs text-amber-300">
+          i-MVE ROI inactive — area table uses Gmail job matching until i-MVE import is confirmed.
+        </p>
+      )}
+      <dl className="mb-4 grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
+        <div>
+          <dt className="text-slate-500">Total i-MVE matches</dt>
+          <dd className="text-white tabular-nums">{t.total_matches}</dd>
+        </div>
+        <div>
+          <dt className="text-slate-500">Auto-matched</dt>
+          <dd className="text-emerald-300 tabular-nums">{t.auto_matched}</dd>
+        </div>
+        <div>
+          <dt className="text-slate-500">Manually approved</dt>
+          <dd className="text-cyan-300 tabular-nums">{t.manually_approved}</dd>
+        </div>
+        <div>
+          <dt className="text-slate-500">Needs review</dt>
+          <dd className="text-amber-300 tabular-nums">{t.needs_review}</dd>
+        </div>
+        <div>
+          <dt className="text-slate-500">Rejected</dt>
+          <dd className="text-rose-300 tabular-nums">{t.rejected}</dd>
+        </div>
+        <div>
+          <dt className="text-slate-500">deposit_paid = true</dt>
+          <dd className="text-white tabular-nums">{t.with_deposit_paid}</dd>
+        </div>
+        <div>
+          <dt className="text-slate-500">deposit_amount &gt; 0</dt>
+          <dd className="text-white tabular-nums">{t.with_deposit_amount}</dd>
+        </div>
+        <div>
+          <dt className="text-slate-500">turnover_value &gt; 0</dt>
+          <dd className="text-white tabular-nums">{t.with_turnover_value}</dd>
+        </div>
+        <div>
+          <dt className="text-slate-500">Included in ROI</dt>
+          <dd className="text-emerald-300 tabular-nums">{t.included_in_roi}</dd>
+        </div>
+        <div>
+          <dt className="text-slate-500">Excluded from ROI</dt>
+          <dd className="text-slate-400 tabular-nums">{t.excluded_from_roi}</dd>
+        </div>
+      </dl>
+
+      {roi.excluded_samples.length > 0 && (
+        <div className="mb-4">
+          <p className="mb-1 text-xs text-slate-500">Exclusion samples</p>
+          <ul className="space-y-1 text-xs text-slate-400">
+            {roi.excluded_samples.map((e, i) => (
+              <li key={`${e.lead_name}-${i}`}>
+                {e.lead_name ?? "Unknown"} · {e.match_status} ·{" "}
+                {reasonLabels[e.reason] ?? e.reason}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div className="mb-4 overflow-x-auto">
+        <p className="mb-2 text-xs text-slate-500">Per postcode area</p>
+        <table className="min-w-full text-left text-xs">
+          <thead>
+            <tr className="text-slate-500">
+              <th className="pr-3 pb-1 font-normal">Area</th>
+              <th className="pr-3 pb-1 font-normal">Matched leads</th>
+              <th className="pr-3 pb-1 font-normal">Usable ROI</th>
+              <th className="pr-3 pb-1 font-normal">Deposits</th>
+              <th className="pr-3 pb-1 font-normal">Booked</th>
+              <th className="pr-3 pb-1 font-normal">Turnover</th>
+              <th className="pr-3 pb-1 font-normal">Commission</th>
+              <th className="pr-3 pb-1 font-normal">ROI</th>
+            </tr>
+          </thead>
+          <tbody>
+            {roi.by_area
+              .filter(
+                (a) =>
+                  a.cmm_leads_in_area > 0 ||
+                  a.usable_roi_matches > 0 ||
+                  a.matched_cmm_leads > 0
+              )
+              .map((a) => (
+                <tr key={a.area} className="border-t border-white/5 text-slate-300">
+                  <td className="pr-3 py-1 font-medium text-cyan-300">{a.area}</td>
+                  <td className="pr-3 py-1 tabular-nums">{a.matched_cmm_leads}</td>
+                  <td className="pr-3 py-1 tabular-nums">{a.usable_roi_matches}</td>
+                  <td className="pr-3 py-1 tabular-nums">{a.deposit_jobs_counted}</td>
+                  <td className="pr-3 py-1 tabular-nums">{a.booked_jobs_counted}</td>
+                  <td className="pr-3 py-1 tabular-nums">
+                    {a.turnover_summed > 0
+                      ? formatCurrency(a.turnover_summed)
+                      : "—"}
+                  </td>
+                  <td className="pr-3 py-1 tabular-nums">
+                    {a.commission_summed > 0
+                      ? formatCurrency(a.commission_summed)
+                      : "—"}
+                  </td>
+                  <td className="py-1">
+                    {a.roi_value != null ? (
+                      <span title={a.roi_formula}>{formatPct(a.roi_value)}</span>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                </tr>
+              ))}
+          </tbody>
+        </table>
+      </div>
+
+      {roi.match_evaluations.length > 0 && (
+        <div>
+          <p className="mb-2 text-xs text-slate-500">Match include / exclude detail</p>
+          <ul className="max-h-64 space-y-2 overflow-y-auto text-xs">
+            {roi.match_evaluations.map((e) => (
+              <li
+                key={e.lead_id}
+                className={`rounded border p-2 ${
+                  e.included
+                    ? "border-emerald-500/20 bg-emerald-950/20"
+                    : "border-white/5 bg-black/20"
+                }`}
+              >
+                <p className="font-medium text-white">
+                  {e.lead_name ?? "Unknown"} · {e.area} · {e.match_status}
+                  {e.job_reference ? ` · ${e.job_reference}` : ""}
+                </p>
+                <p className={e.included ? "text-emerald-300" : "text-amber-300"}>
+                  {e.included
+                    ? "Included in ROI"
+                    : reasonLabels[e.exclusion_reason ?? ""] ??
+                      e.exclusion_reason ??
+                      "Excluded"}
+                </p>
+                {e.included && (
+                  <p className="text-slate-500">
+                    Deposit: {e.deposit_paid ? "yes" : "no"}
+                    {e.deposit_amount != null
+                      ? ` (${formatCurrency(e.deposit_amount)})`
+                      : ""}
+                    · Turnover:{" "}
+                    {formatCurrency(e.turnover_value ?? e.quote_value ?? 0)}
+                    · Commission: {formatCurrency(e.commission_value ?? 0)}
+                  </p>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ImveImportDebugPanel({ debug }: { debug: ImveImportDebug }) {
   const { import_counts: ic, matching_counts: mc } = debug;
 
@@ -732,10 +910,12 @@ function ImveImportDebugPanel({ debug }: { debug: ImveImportDebug }) {
         </ul>
       </div>
 
+      <ImveRoiEligibilitySection roi={debug.roi_eligibility} />
+
       {debug.file_mapping_debug.length > 0 && (
         <div>
           <p className="mb-2 text-xs uppercase tracking-widest text-slate-500">
-            5. Per-file headers &amp; column mapping
+            6. Per-file headers &amp; column mapping
           </p>
           <div className="space-y-4">
             {debug.file_mapping_debug.map((file) => (

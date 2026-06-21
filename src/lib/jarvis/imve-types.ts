@@ -210,6 +210,70 @@ export type ImveImportDebugSampleMatch = {
   explanation: string | null;
 };
 
+export type ImveRoiExclusionReason =
+  | "no_match"
+  | "status_needs_review"
+  | "status_rejected"
+  | "status_unmatched"
+  | "status_not_eligible"
+  | "missing_imve_job_id"
+  | "imve_job_not_found"
+  | "no_deposit_or_value";
+
+export type ImveRoiMatchEvaluation = {
+  lead_id: string;
+  lead_name: string | null;
+  area: PostcodeArea;
+  match_status: ImveCmmMatchStatus | "none";
+  included: boolean;
+  exclusion_reason: ImveRoiExclusionReason | null;
+  deposit_paid: boolean;
+  deposit_amount: number | null;
+  turnover_value: number | null;
+  quote_value: number | null;
+  commission_value: number | null;
+  booked: boolean;
+  job_reference: string | null;
+};
+
+export type ImveRoiAreaBreakdown = {
+  area: PostcodeArea;
+  cmm_leads_in_area: number;
+  matched_cmm_leads: number;
+  usable_roi_matches: number;
+  deposit_jobs_counted: number;
+  booked_jobs_counted: number;
+  turnover_summed: number;
+  commission_summed: number;
+  roi_formula: string;
+  roi_value: number | null;
+  spend_all_time: number;
+};
+
+export type ImveRoiEligibilityDebug = {
+  using_imve_for_roi: boolean;
+  totals: {
+    total_matches: number;
+    auto_matched: number;
+    manually_approved: number;
+    needs_review: number;
+    rejected: number;
+    unmatched: number;
+    with_deposit_paid: number;
+    with_deposit_amount: number;
+    with_turnover_value: number;
+    included_in_roi: number;
+    excluded_from_roi: number;
+  };
+  excluded_samples: Array<{
+    lead_name: string | null;
+    match_status: string;
+    reason: string;
+  }>;
+  match_evaluations: ImveRoiMatchEvaluation[];
+  by_area: ImveRoiAreaBreakdown[];
+};
+
 export type ImveImportDebug = {
   import_counts: {
     files_uploaded: number;
@@ -241,4 +305,6 @@ export type ImveImportDebug = {
   warnings: string[];
   /** Per-file header → field mapping from stored raw exports */
   file_mapping_debug: ImveFileMappingDebug[];
+  /** ROI handoff: which matches count toward area deposit/turnover/commission */
+  roi_eligibility: ImveRoiEligibilityDebug;
 };

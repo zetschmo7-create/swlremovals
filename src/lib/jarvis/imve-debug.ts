@@ -13,6 +13,10 @@ import type {
 import { applyInvoicesToJobsWithLinking } from "./imve-invoice-link";
 import { renormalizeLedgerFromRaw } from "./imve-normalize";
 import { buildFileMappingDebug } from "./imve-file-debug";
+import { buildImveRoiEligibilityDebug } from "./imve-roi-debug";
+import { isImveRoiActive } from "./imve-validate";
+
+const ROI_AREAS = ["GU", "RH", "TN", "SM", "CR", "Other", "Unknown"] as const;
 
 function mergeFieldMappings(
   ledger: ImveImportLedger
@@ -161,6 +165,27 @@ export function buildImveImportDebug(
     if (!warnings.includes(w)) warnings.push(w);
   }
 
+  const useImveRoi = isImveRoiActive(ledger);
+  const roi_eligibility = buildImveRoiEligibilityDebug(
+    cmmLeads,
+    matchLedger?.matches ?? {},
+    ledger.jobs,
+    useImveRoi,
+    settings.costPerLead,
+    [...ROI_AREAS]
+  );
+
+  if (
+    useImveRoi &&
+    roi_eligibility.totals.included_in_roi === 0 &&
+    (roi_eligibility.totals.auto_matched > 0 ||
+      roi_eligibility.totals.manually_approved > 0)
+  ) {
+    warnings.push(
+      "Matched leads exist but none qualify for ROI (need deposit paid or turnover/quote value on linked i-MVE job)."
+    );
+  }
+
   return {
     import_counts: {
       files_uploaded: ledger.raw_files.length,
@@ -191,5 +216,6 @@ export function buildImveImportDebug(
     sample_matches,
     warnings,
     file_mapping_debug: buildLedgerFileMappingDebug(ledger),
+    roi_eligibility,
   };
 }
