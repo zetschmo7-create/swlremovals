@@ -23,6 +23,11 @@ import { getJarvisSettings } from "./settings-store";
 import { isImveRoiActive } from "./imve-validate";
 import type { CmmLeadRecord } from "./types";
 import type { ImveCmmLeadMatch, ImveJobRecord } from "./imve-types";
+import {
+  resolveRoiCandidate,
+  resolveTraceMode,
+  type RoiTraceCandidate,
+} from "./trace-lead-candidates";
 
 const AUTO_MATCH = 85;
 const REVIEW_MIN = 55;
@@ -100,9 +105,33 @@ export type LeadTraceStepMatch = {
   predicted_status: ImveCmmLeadMatch["match_status"];
   stored_match_status: ImveCmmLeadMatch["match_status"] | "none";
   stored_imve_job_id: string | null;
+  candidate_job_reference: string | null;
+  linked_job_reference: string | null;
   reason_if_not_matched: string;
   thresholds: { auto_matched: number; needs_review: number };
   explanation: string | null;
+};
+
+export type LeadTraceStepApproval = {
+  stored_match_status: ImveCmmLeadMatch["match_status"] | "none";
+  is_manually_approved: boolean;
+  is_auto_matched: boolean;
+  is_needs_review: boolean;
+  is_rejected: boolean;
+  in_review_queue: boolean;
+  candidate_job_reference: string | null;
+  linked_job_reference: string | null;
+};
+
+export type LeadTraceStepDepositValue = {
+  job_deposit_paid: boolean;
+  job_deposit_amount: number | null;
+  job_turnover: number | null;
+  job_quote_value: number | null;
+  match_deposit_paid: boolean;
+  has_deposit_signal: boolean;
+  has_value_signal: boolean;
+  qualifies_for_roi_data: boolean;
 };
 
 export type LeadTraceStepRoi = {
@@ -118,6 +147,9 @@ export type LeadTraceStepRoi = {
 
 export type LeadTraceReport = {
   query: string;
+  trace_mode: "parser" | "roi";
+  roi_candidate_label: string | null;
+  parser_test_note: string | null;
   traced_at: string;
   cmm_parser_version: string;
   cmm_ledger_rebuilt_at: string | null;
@@ -129,6 +161,8 @@ export type LeadTraceReport = {
   step4_stored: LeadTraceStepStored;
   step5_imve_job: LeadTraceStepImveJob;
   step6_match: LeadTraceStepMatch;
+  step_approval: LeadTraceStepApproval;
+  step_deposit_value: LeadTraceStepDepositValue;
   step7_roi: LeadTraceStepRoi;
 };
 
@@ -177,29 +211,55 @@ function jobMatchesQuery(job: ImveJobRecord, q: string): boolean {
   return hay.includes(n);
 }
 
-function findCmmLead(leads: CmmLeadRecord[], query: string): CmmLeadRecord | null {
-  const direct = leads.find((l) => leadMatchesQuery(l, query));
-  if (direct) return direct;
-
-  const carl = leads.find(
-    (l) =>
-      /carl/i.test(l.customer_name ?? "") ||
-      /car-1781959748/i.test(l.cmm_internal_id ?? "")
+function jobRefMatches(job: ImveJobRecord, ref: string): boolean {
+  const digits = ref.replace(/\D/g, "");
+  const jr = (job.job_reference ?? "").replace(/\D/g, "");
+  return (
+    job.job_reference === ref ||
+    jr === digits ||
+    (digits.length > 0 && jr.endsWith(digits))
   );
-  return carl ?? null;
 }
 
-function findImveJob(jobs: ImveJobRecord[], query: string): ImveJobRecord | null {
-  const direct = jobs.find((j) => jobMatchesQuery(j, query));
-  if (direct) return direct;
+function findLeadByFirstName(
+  leads: CmmLeadRecord[],
+  firstName: string
+): CmmLeadRecord | null {
+  const n = firstName.toLowerCase().trim();
+  const matches = leads.filter((l) => {
+    const first = (l.customer_name ?? "").toLowerCase().trim().split(/\s+/)[0];
+    return first === n;
+  });
+  if (matches.length === 0) return null;
+  return matches.sort((a, b) => {
+    const emailScore = (l: CmmLeadRecord) => (l.customer_email ? 1 : 0);
+    if (emailScore(b) !== emailScore(a)) return emailScore(b) - emailScore(a);
+    return new Date(b.received_at).getTime() - new Date(a.received_at).getTime();
+  })[0];
+}
 
-  const job3655 = jobs.find(
-    (j) =>
-      j.job_reference === "3655" ||
-      j.job_reference?.endsWith("3655") ||
-      /3655/.test(j.job_reference ?? "")
-  );
-  return job3655 ?? null;
+function findCmmLead(
+  leads: CmmLeadRecord[],
+  query: string,
+  candidate: RoiTraceCandidate | null
+): CmmLeadRecord | null {
+  if (candidate) {
+    const byName = findLeadByFirstName(leads, candidate.leadQuery);
+    if (byName) return byName;
+  }
+  return leads.find((l) => leadMatchesQuery(l, query)) ?? null;
+}
+
+function findImveJob(
+  jobs: ImveJobRecord[],
+  query: string,
+  candidate: RoiTraceCandidate | null
+): ImveJobRecord | null {
+  if (candidate) {
+    const paired = jobs.find((j) => jobRefMatches(j, candidate.jobRef));
+    if (paired) return paired;
+  }
+  return jobs.find((j) => jobMatchesQuery(j, query)) ?? null;
 }
 
 function classifyImveScore(score: number): ImveCmmLeadMatch["match_status"] {
@@ -239,69 +299,101 @@ function fieldMismatches(
 function buildDiagnosis(report: Omit<LeadTraceReport, "diagnosis">): string {
   const issues: string[] = [];
 
-  if (!report.step1_gmail.found) {
-    issues.push("Gmail message not found — check CMM label and search query.");
-  } else if (!report.step2_body.extracted || report.step2_body.body_chars < 80) {
-    issues.push("Gmail body empty or too short — rebuild may be parsing snippet only.");
+  if (report.trace_mode === "parser") {
+    if (!report.step1_gmail.found) {
+      issues.push("Gmail message not found — check CMM label and search query.");
+    } else if (!report.step2_body.extracted || report.step2_body.body_chars < 80) {
+      issues.push("Gmail body empty or too short — rebuild may be parsing snippet only.");
+    }
+    if (report.step3_parsed.parse_failure) {
+      issues.push(`Fresh parse failed: ${report.step3_parsed.parse_failure}`);
+    } else {
+      if (!hasFullName(report.step3_parsed.customer_name)) {
+        issues.push("Parser did not extract full name.");
+      }
+      if (!report.step3_parsed.customer_email) {
+        issues.push("Parser did not extract email.");
+      }
+      if (!report.step3_parsed.customer_phone) {
+        issues.push("Parser did not extract phone.");
+      }
+      if (!report.step3_parsed.current_postcode) {
+        issues.push("Parser did not extract current postcode.");
+      }
+    }
+    if (report.step4_stored.field_mismatches.length > 0) {
+      issues.push(
+        `${report.step4_stored.field_mismatches.length} field mismatch(es) — run Repair or Rebuild CMM ledger.`
+      );
+    }
+    if (issues.length === 0) {
+      return "CMM parser test passed. Carl is unquoted — use Will→3064 (or Jo/Kevin) for ROI trace.";
+    }
+    return issues.join(" ");
   }
 
-  if (report.step3_parsed.parse_failure) {
-    issues.push(`Fresh parse failed: ${report.step3_parsed.parse_failure}`);
-  } else if (
-    report.step3_parsed.customer_email &&
-    !report.step4_stored.has_email
-  ) {
-    issues.push(
-      "Fresh parse has email but stored ledger does not — run Repair lead or Rebuild CMM ledger."
-    );
-  } else if (
-    report.step3_parsed.customer_phone &&
-    !report.step4_stored.has_phone
-  ) {
-    issues.push(
-      "Fresh parse has phone but stored ledger does not — run Repair lead or Rebuild CMM ledger."
-    );
-  } else if (
-    hasFullName(report.step3_parsed.customer_name) &&
-    !report.step4_stored.has_full_name
-  ) {
-    issues.push(
-      "Fresh parse has full name but stored ledger does not — run Repair lead or Rebuild CMM ledger."
-    );
-  }
-
-  if (report.step4_stored.field_mismatches.length > 0) {
-    issues.push(
-      `${report.step4_stored.field_mismatches.length} field mismatch(es) between stored ledger and fresh parse.`
-    );
+  // ROI trace mode
+  if (!report.step4_stored.found) {
+    issues.push("CMM lead not found in stored ledger.");
+  } else if (!report.step4_stored.has_email && !report.step4_stored.has_phone) {
+    issues.push("Stored CMM lead missing email and phone — matching will be weak.");
   }
 
   if (!report.step5_imve_job.found) {
-    issues.push("i-MVE job not found for query — check i-MVE import.");
-  } else if (report.step6_match.predicted_status === "unmatched") {
+    issues.push(
+      `i-MVE job not found${report.roi_candidate_label ? ` for ${report.roi_candidate_label}` : ""}.`
+    );
+  }
+
+  if (report.step6_match.predicted_status === "unmatched") {
     issues.push(
       `Match score ${report.step6_match.score} below review minimum (${REVIEW_MIN}) — ${report.step6_match.reason_if_not_matched}`
     );
   } else if (report.step6_match.stored_match_status === "none") {
-    issues.push("Match score OK but no stored i-MVE match — run Rematch i-MVE → CMM.");
-  } else if (
-    report.step6_match.predicted_status !== report.step6_match.stored_match_status
-  ) {
+    issues.push("No stored i-MVE match — run Rematch i-MVE → CMM.");
+  }
+
+  if (report.step_approval.is_needs_review) {
+    issues.push("Match is needs_review — approve in Data Imports to count toward ROI.");
+  } else if (report.step_approval.is_rejected) {
+    issues.push("Match was rejected — will not count toward ROI.");
+  } else if (report.step_approval.is_manually_approved) {
+    // expected after approval — no issue
+  } else if (!report.step_approval.is_auto_matched && report.step6_match.score >= REVIEW_MIN) {
+    issues.push("Match should be in review queue or approved but status is unclear.");
+  }
+
+  if (!report.step_deposit_value.qualifies_for_roi_data) {
     issues.push(
-      `Stored match status (${report.step6_match.stored_match_status}) differs from predicted (${report.step6_match.predicted_status}).`
+      "Job has no deposit paid and no turnover/quote value — cannot count toward ROI even if approved."
     );
   }
 
-  if (!report.step7_roi.included) {
+  if (
+    (report.step_approval.is_manually_approved || report.step_approval.is_auto_matched) &&
+    report.step_deposit_value.qualifies_for_roi_data &&
+    !report.step7_roi.included
+  ) {
     issues.push(
-      `ROI excluded: ${report.step7_roi.exclusion_reason ?? "unknown"}`
+      `Approved/auto match with deposit/value but ROI excluded: ${report.step7_roi.exclusion_reason ?? "unknown"}`
     );
-  } else if (report.step7_roi.area_turnover === 0) {
-    issues.push("ROI includes match but area turnover is still zero — area table bug.");
+  }
+
+  if (report.step7_roi.included && report.step7_roi.area_turnover === 0) {
+    issues.push("ROI includes match but area turnover is zero — area table consumption bug.");
   }
 
   if (issues.length === 0) {
-    return "End-to-end trace looks healthy for this lead.";
+    if (report.step_approval.is_manually_approved && report.step7_roi.included) {
+      return `ROI trace healthy: manually approved, included in ROI, area ${report.step7_roi.area} updated.`;
+    }
+    if (report.step_approval.is_auto_matched && report.step7_roi.included) {
+      return `ROI trace healthy: auto-matched and included in ROI for area ${report.step7_roi.area}.`;
+    }
+    if (report.step_approval.is_needs_review) {
+      return `Match ready for approval (${report.roi_candidate_label ?? report.query}). Approve then re-trace.`;
+    }
+    return "ROI trace looks healthy for this candidate.";
   }
   return issues.join(" ");
 }
@@ -309,6 +401,8 @@ function buildDiagnosis(report: Omit<LeadTraceReport, "diagnosis">): string {
 export async function traceLead(query: string): Promise<LeadTraceReport> {
   const settings = await getJarvisSettings();
   const leadCost = settings.costPerLead;
+  const traceMode = resolveTraceMode(query);
+  const roiCandidate = resolveRoiCandidate(query);
   const ledger = await getCmmLeadLedger();
   const leads = ledger?.leads ?? [];
   const imveLedger = await getImveImportLedgerOrEmpty();
@@ -317,23 +411,30 @@ export async function traceLead(query: string): Promise<LeadTraceReport> {
   const rebuiltAt = await getCmmLastBackfillAt();
   const syncMeta = await getCmmSyncMeta();
 
-  const storedLead = findCmmLead(leads, query);
-  const targetJob = findImveJob(imveJobs, query);
+  const storedLead = findCmmLead(leads, query, roiCandidate);
+  const targetJob = findImveJob(imveJobs, query, roiCandidate);
 
-  let gmailEmail = storedLead
-    ? await fetchGmailMessageById(storedLead.gmail_message_id)
-    : null;
+  const runGmailParse = traceMode === "parser" || !storedLead;
+  let gmailEmail = null as Awaited<ReturnType<typeof fetchGmailMessageById>>;
   let searchUsed: string | null = null;
 
-  if (!gmailEmail) {
-    searchUsed = query;
-    const results = await searchCmmGmailMessages(query, 5);
-    gmailEmail =
-      results.find((e) =>
-        /carl|yabasto|car-1781959748/i.test(
-          `${e.subject}\n${e.body}\n${e.snippet}`
-        )
-      ) ?? results[0] ?? null;
+  if (runGmailParse) {
+    gmailEmail = storedLead
+      ? await fetchGmailMessageById(storedLead.gmail_message_id)
+      : null;
+
+    if (!gmailEmail) {
+      searchUsed = query;
+      const results = await searchCmmGmailMessages(query, 8);
+      gmailEmail =
+        traceMode === "parser"
+          ? results.find((e) =>
+              /carl|yabasto|car-1781959748/i.test(
+                `${e.subject}\n${e.body}\n${e.snippet}`
+              )
+            ) ?? results[0] ?? null
+          : results[0] ?? null;
+    }
   }
 
   const bodyText = gmailEmail?.body ?? "";
@@ -342,9 +443,13 @@ export async function traceLead(query: string): Promise<LeadTraceReport> {
     ? `${gmailEmail.subject}\n${bodyText || gmailEmail.snippet}`
     : "";
 
-  const freshParse = gmailEmail
-    ? parseCmmLeadEmailWithReason(gmailEmail, leadCost)
-    : { lead: null, failureReason: "No Gmail message to parse" };
+  const freshParse =
+    runGmailParse && gmailEmail
+      ? parseCmmLeadEmailWithReason(gmailEmail, leadCost)
+      : {
+          lead: null,
+          failureReason: traceMode === "roi" ? null : "No Gmail message to parse",
+        };
 
   const parsed: LeadTraceStepParsed = freshParse.lead
     ? {
@@ -367,6 +472,11 @@ export async function traceLead(query: string): Promise<LeadTraceReport> {
         cmm_internal_id: null,
         parse_failure: freshParse.failureReason,
       };
+
+  const fieldMismatchesList =
+    traceMode === "parser" && storedLead
+      ? fieldMismatches(storedLead, parsed)
+      : [];
 
   const resolvedLead =
     storedLead ??
@@ -392,7 +502,7 @@ export async function traceLead(query: string): Promise<LeadTraceReport> {
         has_phone: Boolean(resolvedLead.customer_phone),
         ledger_rebuilt_at: rebuiltAt,
         parser_version: CMM_PARSER_VERSION,
-        field_mismatches: fieldMismatches(resolvedLead, parsed),
+        field_mismatches: fieldMismatchesList,
       }
     : {
         found: false,
@@ -444,12 +554,22 @@ export async function traceLead(query: string): Promise<LeadTraceReport> {
       };
 
   const leadForMatch = resolvedLead ?? freshParse.lead;
+  const storedMatchRecord = leadForMatch
+    ? matchLedger?.matches[leadForMatch.gmail_message_id]
+    : undefined;
+  const inReviewQueue = Boolean(
+    leadForMatch &&
+      matchLedger?.reviewQueue.some((r) => r.lead_id === leadForMatch.gmail_message_id)
+  );
+
   let matchStep: LeadTraceStepMatch = {
     score: 0,
     signals: [],
     predicted_status: "unmatched",
     stored_match_status: "none",
     stored_imve_job_id: null,
+    candidate_job_reference: storedMatchRecord?.candidate_job_reference ?? null,
+    linked_job_reference: storedMatchRecord?.job_reference ?? null,
     reason_if_not_matched: "No CMM lead available for matching",
     thresholds: { auto_matched: AUTO_MATCH, needs_review: REVIEW_MIN },
     explanation: null,
@@ -458,7 +578,7 @@ export async function traceLead(query: string): Promise<LeadTraceReport> {
   if (leadForMatch && job) {
     const { score, reasons } = scoreImveLeadMatch(leadForMatch, job);
     const predicted = classifyImveScore(score);
-    const storedMatch = matchLedger?.matches[leadForMatch.gmail_message_id];
+    const storedMatch = storedMatchRecord;
     let reason = "";
     if (score < REVIEW_MIN) {
       const missing: string[] = [];
@@ -479,11 +599,45 @@ export async function traceLead(query: string): Promise<LeadTraceReport> {
       predicted_status: predicted,
       stored_match_status: storedMatch?.match_status ?? "none",
       stored_imve_job_id: storedMatch?.imve_job_id ?? null,
+      candidate_job_reference:
+        storedMatch?.candidate_job_reference ?? job.job_reference,
+      linked_job_reference: storedMatch?.job_reference ?? job.job_reference,
       reason_if_not_matched: reason,
       thresholds: { auto_matched: AUTO_MATCH, needs_review: REVIEW_MIN },
       explanation: explainImveMatchDecision(leadForMatch, { job, score, reasons }),
     };
   }
+
+  const matchStatus = storedMatchRecord?.match_status ?? "none";
+  const approvalStep: LeadTraceStepApproval = {
+    stored_match_status: matchStatus,
+    is_manually_approved: matchStatus === "approved",
+    is_auto_matched: matchStatus === "auto_matched",
+    is_needs_review: matchStatus === "needs_review",
+    is_rejected: matchStatus === "rejected",
+    in_review_queue: inReviewQueue,
+    candidate_job_reference: storedMatchRecord?.candidate_job_reference ?? job?.job_reference ?? null,
+    linked_job_reference: storedMatchRecord?.job_reference ?? job?.job_reference ?? null,
+  };
+
+  const matchJobForSignals =
+    job ?? imveJobs.find((j) => j.imve_id === storedMatchRecord?.imve_job_id);
+  const hasDeposit =
+    Boolean(storedMatchRecord?.deposit_paid) ||
+    Boolean(matchJobForSignals?.deposit_paid) ||
+    (matchJobForSignals?.deposit_amount ?? 0) > 0;
+  const hasValue =
+    (matchJobForSignals?.turnover ?? matchJobForSignals?.quote_value ?? 0) > 0;
+  const depositValueStep: LeadTraceStepDepositValue = {
+    job_deposit_paid: matchJobForSignals?.deposit_paid ?? false,
+    job_deposit_amount: matchJobForSignals?.deposit_amount ?? null,
+    job_turnover: matchJobForSignals?.turnover ?? null,
+    job_quote_value: matchJobForSignals?.quote_value ?? null,
+    match_deposit_paid: storedMatchRecord?.deposit_paid ?? false,
+    has_deposit_signal: hasDeposit,
+    has_value_signal: hasValue,
+    qualifies_for_roi_data: hasDeposit || hasValue,
+  };
 
   let roiStep: LeadTraceStepRoi = {
     included: false,
@@ -529,19 +683,33 @@ export async function traceLead(query: string): Promise<LeadTraceReport> {
 
   const partial: Omit<LeadTraceReport, "diagnosis"> = {
     query,
+    trace_mode: traceMode,
+    roi_candidate_label: roiCandidate?.label ?? null,
+    parser_test_note:
+      traceMode === "parser"
+        ? "Parser test only — Carl is a new unquoted lead; not used for ROI validation."
+        : null,
     traced_at: new Date().toISOString(),
     cmm_parser_version: CMM_PARSER_VERSION,
     cmm_ledger_rebuilt_at: rebuiltAt,
     cmm_ledger_last_sync_at: syncMeta?.lastSyncAt ?? null,
     step1_gmail: {
       found: Boolean(gmailEmail),
-      message_id: gmailEmail?.id ?? null,
+      message_id: gmailEmail?.id ?? resolvedLead?.gmail_message_id ?? null,
       subject: gmailEmail?.subject ?? null,
       body_length: bodyText.length,
-      body_preview: bodyText.slice(0, 400) || null,
+      body_preview:
+        traceMode === "roi" && !runGmailParse
+          ? "(skipped — ROI trace uses stored ledger; use Carl for parser test)"
+          : bodyText.slice(0, 400) || null,
       snippet: gmailEmail?.snippet ?? null,
       search_used: searchUsed,
-      failure_reason: gmailEmail ? null : "Gmail message not found for query",
+      failure_reason:
+        traceMode === "roi" && storedLead
+          ? null
+          : gmailEmail
+            ? null
+            : "Gmail message not found for query",
     },
     step2_body: {
       extracted: bodyText.length > 0,
@@ -553,6 +721,8 @@ export async function traceLead(query: string): Promise<LeadTraceReport> {
     step4_stored: stored,
     step5_imve_job: imveStep,
     step6_match: matchStep,
+    step_approval: approvalStep,
+    step_deposit_value: depositValueStep,
     step7_roi: roiStep,
   };
 

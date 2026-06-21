@@ -63,7 +63,7 @@ export async function POST(request: Request) {
       const intelligence = await loadCmmLeadIntelligence(settings, {
         imveMatchLedger: matchLedger,
       });
-      const trace = await traceLead(body.query ?? "Carl");
+      const trace = await traceLead(body.query ?? "Will");
 
       return NextResponse.json({ repair, intelligence, matchLedger, trace });
     }
