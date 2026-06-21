@@ -26,7 +26,11 @@ import { isImveRoiActive } from "./imve-validate";
 import { getImveCmmMatchLedger } from "./imve-cmm-match-store";
 import { isImveMatchUsableForRoi } from "./imve-cmm-match";
 import { imveJobToJobRecord } from "./imve-to-job";
-import type { ImveCmmLeadMatch, ImveJobRecord } from "./imve-types";
+import type {
+  ImveCmmLeadMatch,
+  ImveCmmMatchLedger,
+  ImveJobRecord,
+} from "./imve-types";
 import { buildCmmCompletenessStats } from "./cmm-completeness";
 import {
   evaluateImveMatchForRoi,
@@ -404,7 +408,7 @@ export function buildCmmLeadIntelligenceFromLeads(
 
 export async function loadCmmLeadIntelligence(
   settings: JarvisSettings,
-  options?: { rematch?: boolean }
+  options?: { rematch?: boolean; imveMatchLedger?: ImveCmmMatchLedger | null }
 ): Promise<CmmLeadIntelligence> {
   const ledger = await getCmmLeadLedger();
   const syncMeta = await getCmmSyncMeta();
@@ -415,7 +419,10 @@ export async function loadCmmLeadIntelligence(
   const imveRoiActive = isImveRoiActive(imveLedger);
 
   let matchLedger = await getCmmMatchLedger();
-  let imveMatchLedger = await getImveCmmMatchLedger();
+  let imveMatchLedger =
+    options?.imveMatchLedger !== undefined
+      ? options.imveMatchLedger
+      : await getImveCmmMatchLedger();
   const shouldRematch =
     options?.rematch ||
     !matchLedger ||
@@ -427,6 +434,7 @@ export async function loadCmmLeadIntelligence(
   }
 
   if (
+    options?.imveMatchLedger === undefined &&
     (options?.rematch || !imveMatchLedger) &&
     leads.length > 0 &&
     imveRoiActive &&

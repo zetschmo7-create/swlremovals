@@ -1,6 +1,7 @@
 "use client";
 
-import type { JarvisBriefing, JarvisTask, TaskBucket } from "@/lib/jarvis/types";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { CmmLeadIntelligence, JarvisBriefing, JarvisTask, TaskBucket } from "@/lib/jarvis/types";
 import {
   formatCurrency,
   formatPct,
@@ -37,13 +38,32 @@ export function JarvisHomeView({
   briefing: JarvisBriefing;
   onRefresh?: () => void;
 }) {
-  const { executive, payday, commissionForecast } = briefing;
-  const jakeTasks = briefing.tasks.jake.slice(0, 6);
-  const hotLeads = briefing.hotLeads.leads.slice(0, 4);
+  const [cmmIntelOverride, setCmmIntelOverride] =
+    useState<CmmLeadIntelligence | null>(null);
+
+  useEffect(() => {
+    setCmmIntelOverride(null);
+  }, [briefing.generatedAt]);
+
+  const handleCmmIntelUpdated = useCallback((intel: CmmLeadIntelligence) => {
+    setCmmIntelOverride(intel);
+  }, []);
+
+  const activeBriefing = useMemo(
+    () =>
+      cmmIntelOverride
+        ? { ...briefing, cmmLeadIntelligence: cmmIntelOverride }
+        : briefing,
+    [briefing, cmmIntelOverride]
+  );
+
+  const { executive, payday, commissionForecast } = activeBriefing;
+  const jakeTasks = activeBriefing.tasks.jake.slice(0, 6);
+  const hotLeads = activeBriefing.hotLeads.leads.slice(0, 4);
 
   return (
     <div className="space-y-2">
-      <DataQualityPanel briefing={briefing} />
+      <DataQualityPanel briefing={activeBriefing} />
 
       {/* Friday Payday */}
       <Section title="Friday Payday Tracker" subtitle={payday.nextPaydayLabel}>
@@ -294,9 +314,13 @@ export function JarvisHomeView({
         )}
       </Section>
 
-      <DataImportsPanel briefing={briefing} onRefresh={onRefresh} />
+      <DataImportsPanel
+        briefing={activeBriefing}
+        onCmmIntelUpdated={handleCmmIntelUpdated}
+        onRefresh={onRefresh}
+      />
 
-      <CmmLeadIntelligencePanel briefing={briefing} onRefresh={onRefresh} />
+      <CmmLeadIntelligencePanel briefing={activeBriefing} onRefresh={onRefresh} />
 
       <JarvisAssistant briefing={briefing} />
 

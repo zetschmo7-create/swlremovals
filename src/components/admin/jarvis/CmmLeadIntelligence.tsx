@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { CmmLeadIntelligence, JarvisBriefing, PostcodeArea } from "@/lib/jarvis/types";
 import {
   formatCurrency,
@@ -26,6 +26,11 @@ export function CmmLeadIntelligencePanel({
   const [chartMode, setChartMode] = useState<ChartMode>("daily");
   const [busy, setBusy] = useState<"rebuild" | "sync" | "rematch" | "review" | null>(null);
   const [localIntel, setLocalIntel] = useState<CmmLeadIntelligence | null>(null);
+
+  useEffect(() => {
+    setLocalIntel(null);
+  }, [intel]);
+
   const data = localIntel ?? intel;
 
   const runAction = useCallback(

@@ -102,8 +102,10 @@ export async function POST(request: Request) {
 
     if (body.action === "confirm" && body.sessionId) {
       const ledger = await confirmImveImport(body.sessionId, settings);
-      const intelligence = await loadCmmLeadIntelligence(settings, { rematch: true });
       const matchLedger = await getImveCmmMatchLedger();
+      const intelligence = await loadCmmLeadIntelligence(settings, {
+        imveMatchLedger: matchLedger,
+      });
       const debug = buildImveImportDebug(ledger, matchLedger, cmmLeads, settings);
       return NextResponse.json({
         ledger: {
@@ -120,7 +122,9 @@ export async function POST(request: Request) {
 
     if (body.action === "rematch" || body.action === "rebuild") {
       const { ledger, matchLedger } = await rematchImveImport(settings);
-      const intelligence = await loadCmmLeadIntelligence(settings, { rematch: true });
+      const intelligence = await loadCmmLeadIntelligence(settings, {
+        imveMatchLedger: matchLedger,
+      });
       const debug = buildImveImportDebug(ledger, matchLedger, cmmLeads, settings);
       return NextResponse.json({ ledger, matchLedger, intelligence, debug });
     }
@@ -142,7 +146,9 @@ export async function POST(request: Request) {
       );
       matchLedger = runImveCmmMatching(cmmLeads, imveLedger.jobs, matchLedger);
       await saveImveCmmMatchLedger(matchLedger);
-      const intelligence = await loadCmmLeadIntelligence(settings);
+      const intelligence = await loadCmmLeadIntelligence(settings, {
+        imveMatchLedger: matchLedger,
+      });
       const debug = buildImveImportDebug(
         imveLedger,
         matchLedger,

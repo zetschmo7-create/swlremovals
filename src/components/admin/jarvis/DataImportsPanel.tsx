@@ -26,9 +26,11 @@ const FILE_TYPE_LABELS: Record<string, string> = {
 
 export function DataImportsPanel({
   briefing,
+  onCmmIntelUpdated,
   onRefresh,
 }: {
   briefing: JarvisBriefing;
+  onCmmIntelUpdated?: (intel: CmmLeadIntelligence) => void;
   onRefresh?: () => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -39,6 +41,15 @@ export function DataImportsPanel({
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [localIntel, setLocalIntel] = useState<CmmLeadIntelligence | null>(null);
+
+  const applyIntelResponse = useCallback(
+    (intel: CmmLeadIntelligence | undefined) => {
+      if (!intel) return;
+      setLocalIntel(intel);
+      onCmmIntelUpdated?.(intel);
+    },
+    [onCmmIntelUpdated]
+  );
   const [matchLedger, setMatchLedger] = useState<ImveCmmMatchLedger | null>(
     null
   );
@@ -118,7 +129,7 @@ export function DataImportsPanel({
         error?: string;
       };
       if (!res.ok) throw new Error(json.error ?? "Import failed");
-      setLocalIntel(json.intelligence ?? null);
+      applyIntelResponse(json.intelligence);
       setMatchLedger(json.matchLedger ?? null);
       if (json.debug) setDebug(json.debug);
       setPreview(null);
@@ -129,7 +140,7 @@ export function DataImportsPanel({
     } finally {
       setBusy(null);
     }
-  }, [onRefresh, preview?.session_id]);
+  }, [onRefresh, preview?.session_id, applyIntelResponse]);
 
   const runRematch = useCallback(async () => {
     setBusy("rematch");
@@ -147,7 +158,7 @@ export function DataImportsPanel({
         error?: string;
       };
       if (!res.ok) throw new Error(json.error ?? "Rematch failed");
-      setLocalIntel(json.intelligence ?? null);
+      applyIntelResponse(json.intelligence);
       setMatchLedger(json.matchLedger ?? null);
       if (json.debug) setDebug(json.debug);
       onRefresh?.();
@@ -156,7 +167,7 @@ export function DataImportsPanel({
     } finally {
       setBusy(null);
     }
-  }, [onRefresh]);
+  }, [onRefresh, applyIntelResponse]);
 
   const runReview = useCallback(
     async (leadId: string, decision: "approve" | "reject") => {
@@ -175,7 +186,7 @@ export function DataImportsPanel({
           error?: string;
         };
         if (!res.ok) throw new Error(json.error ?? "Review failed");
-        setLocalIntel(json.intelligence ?? null);
+        applyIntelResponse(json.intelligence);
         setMatchLedger(json.matchLedger ?? null);
         if (json.debug) setDebug(json.debug);
         onRefresh?.();
@@ -185,7 +196,7 @@ export function DataImportsPanel({
         setBusy(null);
       }
     },
-    [onRefresh]
+    [onRefresh, applyIntelResponse]
   );
 
   const reviewQueue = matchLedger?.reviewQueue ?? [];
