@@ -14,17 +14,39 @@ type VoiceDebugInfo = {
   secureContext: boolean;
   mediaDevicesAvailable: boolean;
   speechRecognitionAvailable: boolean;
+  origin: string;
+  topLevelFrame: boolean;
+  permissionsPolicyMicrophone: string;
+  permissionsQueryState: string;
+  audioInputDevices: string;
   lastGetUserMediaResult: string;
   lastSpeechRecognitionError: string;
+  rawMicTestResult: string;
 };
 
 const INITIAL_DEBUG: VoiceDebugInfo = {
   secureContext: false,
   mediaDevicesAvailable: false,
   speechRecognitionAvailable: false,
+  origin: "",
+  topLevelFrame: true,
+  permissionsPolicyMicrophone: "unknown",
+  permissionsQueryState: "not queried",
+  audioInputDevices: "not enumerated",
   lastGetUserMediaResult: "not attempted",
   lastSpeechRecognitionError: "none",
+  rawMicTestResult: "not run",
 };
+
+const NOT_ALLOWED_DESPITE_SITE_PERMISSION =
+  "Browser returned NotAllowedError despite site permission. Check Permissions-Policy/header, extension interference, or Chrome profile.";
+
+const MIC_TROUBLESHOOTING = [
+  "Try incognito with extensions disabled",
+  "Try a new Chrome profile",
+  "Try a different microphone input in Windows sound settings",
+  "Try https://www.swlremovals.co.uk and https://swlremovals.co.uk separately",
+];
 
 function getSpeechRecognitionCtor():
   | (new () => SpeechRecognitionInstance)
@@ -33,14 +55,71 @@ function getSpeechRecognitionCtor():
   return window.SpeechRecognition ?? window.webkitSpeechRecognition ?? null;
 }
 
+function readPermissionsPolicyMicrophone(): string {
+  if (typeof document === "undefined") return "unknown";
+  try {
+    const doc = document as Document & {
+      permissionsPolicy?: { allowsFeature: (feature: string) => boolean };
+      featurePolicy?: { allowsFeature: (feature: string) => boolean };
+    };
+    if (doc.permissionsPolicy) {
+      return doc.permissionsPolicy.allowsFeature("microphone")
+        ? "allowed (Permissions-Policy)"
+        : "blocked (Permissions-Policy)";
+    }
+    if (doc.featurePolicy) {
+      return doc.featurePolicy.allowsFeature("microphone")
+        ? "allowed (Feature-Policy)"
+        : "blocked (Feature-Policy)";
+    }
+  } catch {
+    /* ignore */
+  }
+  return "API not available";
+}
+
+async function queryMicrophonePermission(): Promise<string> {
+  if (!navigator.permissions?.query) return "not supported";
+  try {
+    const result = await navigator.permissions.query({
+      name: "microphone" as PermissionName,
+    });
+    return result.state;
+  } catch (error) {
+    return `query failed: ${formatGetUserMediaError(error)}`;
+  }
+}
+
+async function enumerateAudioInputs(): Promise<string> {
+  if (!navigator.mediaDevices?.enumerateDevices) return "not supported";
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const inputs = devices.filter((d) => d.kind === "audioinput");
+    if (inputs.length === 0) return "0 audio inputs";
+    const labelled = inputs.filter((d) => d.label).length;
+    const labels = inputs
+      .map((d, i) => d.label || `input ${i + 1} (no label)`)
+      .join("; ");
+    return `${inputs.length} input(s), ${labelled} labelled — ${labels}`;
+  } catch (error) {
+    return `enumerate failed: ${formatGetUserMediaError(error)}`;
+  }
+}
+
 function readDebugSnapshot(): VoiceDebugInfo {
   if (typeof window === "undefined") return INITIAL_DEBUG;
   return {
     secureContext: window.isSecureContext,
     mediaDevicesAvailable: Boolean(navigator.mediaDevices?.getUserMedia),
     speechRecognitionAvailable: Boolean(getSpeechRecognitionCtor()),
+    origin: window.location.origin,
+    topLevelFrame: window.self === window.top,
+    permissionsPolicyMicrophone: readPermissionsPolicyMicrophone(),
+    permissionsQueryState: "not queried",
+    audioInputDevices: "not enumerated",
     lastGetUserMediaResult: "not attempted",
     lastSpeechRecognitionError: "none",
+    rawMicTestResult: "not run",
   };
 }
 
@@ -55,7 +134,11 @@ function isMicPermissionDeniedError(error: unknown): boolean {
 
 function formatGetUserMediaError(error: unknown): string {
   if (error instanceof DOMException) {
-    return `${error.name}: ${error.message}`;
+    const constraint =
+      "constraint" in error && error.constraint
+        ? ` constraint=${String(error.constraint)}`
+        : "";
+    return `${error.name}: ${error.message}${constraint}`;
   }
   if (error instanceof Error) {
     return error.message;
@@ -70,12 +153,15 @@ export function VoiceMode({ briefing }: { briefing: JarvisBriefing }) {
   const [answer, setAnswer] = useState("");
   const [statusNote, setStatusNote] = useState<string | null>(null);
   const [micPermissionDenied, setMicPermissionDenied] = useState(false);
+  const [micDeniedDespiteSitePermission, setMicDeniedDespiteSitePermission] =
+    useState(false);
   const [speechRecognitionError, setSpeechRecognitionError] = useState<
     string | null
   >(null);
   const [ttsError, setTtsError] = useState<string | null>(null);
   const [speechSupported, setSpeechSupported] = useState(false);
   const [debugInfo, setDebugInfo] = useState<VoiceDebugInfo>(INITIAL_DEBUG);
+  const [rawMicTesting, setRawMicTesting] = useState(false);
 
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -89,6 +175,21 @@ export function VoiceMode({ briefing }: { briefing: JarvisBriefing }) {
   const startListeningRef = useRef<() => void>(() => {});
 
   briefingRef.current = briefing;
+
+  const refreshEnvironmentDebug = useCallback(async () => {
+    const [permissionsQueryState, audioInputDevices] = await Promise.all([
+      queryMicrophonePermission(),
+      enumerateAudioInputs(),
+    ]);
+    setDebugInfo((prev) => ({
+      ...readDebugSnapshot(),
+      permissionsQueryState,
+      audioInputDevices,
+      lastGetUserMediaResult: prev.lastGetUserMediaResult,
+      lastSpeechRecognitionError: prev.lastSpeechRecognitionError,
+      rawMicTestResult: prev.rawMicTestResult,
+    }));
+  }, []);
 
   const clearRestartTimer = useCallback(() => {
     if (restartTimerRef.current) {
@@ -111,7 +212,8 @@ export function VoiceMode({ briefing }: { briefing: JarvisBriefing }) {
     const supported = Boolean(getSpeechRecognitionCtor());
     setSpeechSupported(supported);
     setDebugInfo(readDebugSnapshot());
-  }, []);
+    void refreshEnvironmentDebug();
+  }, [refreshEnvironmentDebug]);
 
   const cleanupAudio = useCallback(() => {
     if (audioRef.current) {
@@ -136,6 +238,7 @@ export function VoiceMode({ briefing }: { briefing: JarvisBriefing }) {
 
   const clearVoiceErrors = useCallback(() => {
     setMicPermissionDenied(false);
+    setMicDeniedDespiteSitePermission(false);
     setSpeechRecognitionError(null);
     setStatusNote(null);
     setTtsError(null);
@@ -268,11 +371,84 @@ export function VoiceMode({ briefing }: { briefing: JarvisBriefing }) {
     [scheduleAutoListen, speakAnswer]
   );
 
+  const runRawMicrophoneTest = useCallback(async () => {
+    setRawMicTesting(true);
+    clearVoiceErrors();
+
+    setDebugInfo((prev) => ({
+      ...prev,
+      rawMicTestResult: "requesting…",
+      lastGetUserMediaResult: "raw test: requesting…",
+    }));
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      const message = "mediaDevices.getUserMedia is not available";
+      setDebugInfo((prev) => ({
+        ...prev,
+        rawMicTestResult: message,
+        lastGetUserMediaResult: `raw test: ${message}`,
+      }));
+      setStatusNote(message);
+      setRawMicTesting(false);
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const trackInfo = stream
+        .getAudioTracks()
+        .map((t) => `${t.label || "unlabelled"} (${t.readyState})`)
+        .join("; ");
+      stream.getTracks().forEach((track) => track.stop());
+
+      const audioInputDevices = await enumerateAudioInputs();
+      const permissionsQueryState = await queryMicrophonePermission();
+      const success = `granted — tracks: ${trackInfo || "none"}`;
+
+      setMicPermissionDenied(false);
+      setMicDeniedDespiteSitePermission(false);
+      setDebugInfo((prev) => ({
+        ...prev,
+        rawMicTestResult: success,
+        lastGetUserMediaResult: `raw test: ${success}`,
+        audioInputDevices,
+        permissionsQueryState,
+        permissionsPolicyMicrophone: readPermissionsPolicyMicrophone(),
+      }));
+      setStatusNote("Raw microphone test succeeded.");
+    } catch (error) {
+      const formatted = formatGetUserMediaError(error);
+      const permissionsQueryState = await queryMicrophonePermission();
+      const policyBlocked =
+        readPermissionsPolicyMicrophone().startsWith("blocked");
+
+      setDebugInfo((prev) => ({
+        ...prev,
+        rawMicTestResult: formatted,
+        lastGetUserMediaResult: `raw test: ${formatted}`,
+        permissionsQueryState,
+        permissionsPolicyMicrophone: readPermissionsPolicyMicrophone(),
+      }));
+
+      if (isMicPermissionDeniedError(error)) {
+        setMicPermissionDenied(true);
+        if (permissionsQueryState === "granted" || policyBlocked) {
+          setMicDeniedDespiteSitePermission(true);
+        }
+      } else {
+        setStatusNote(`Raw microphone test failed: ${formatted}`);
+      }
+    } finally {
+      setRawMicTesting(false);
+    }
+  }, [clearVoiceErrors]);
+
   const requestMicrophoneAccess = useCallback(async (): Promise<boolean> => {
     setDebugInfo((prev) => ({
       ...readDebugSnapshot(),
       lastGetUserMediaResult: "requesting…",
       lastSpeechRecognitionError: prev.lastSpeechRecognitionError,
+      rawMicTestResult: prev.rawMicTestResult,
     }));
 
     if (!navigator.mediaDevices?.getUserMedia) {
@@ -289,21 +465,37 @@ export function VoiceMode({ briefing }: { briefing: JarvisBriefing }) {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       stream.getTracks().forEach((track) => track.stop());
 
+      const audioInputDevices = await enumerateAudioInputs();
+      const permissionsQueryState = await queryMicrophonePermission();
+
       setMicPermissionDenied(false);
+      setMicDeniedDespiteSitePermission(false);
       setDebugInfo((prev) => ({
         ...prev,
         lastGetUserMediaResult: "granted (tracks released)",
+        audioInputDevices,
+        permissionsQueryState,
+        permissionsPolicyMicrophone: readPermissionsPolicyMicrophone(),
       }));
       return true;
     } catch (error) {
       const formatted = formatGetUserMediaError(error);
+      const permissionsQueryState = await queryMicrophonePermission();
+      const policyBlocked =
+        readPermissionsPolicyMicrophone().startsWith("blocked");
+
       setDebugInfo((prev) => ({
         ...prev,
         lastGetUserMediaResult: formatted,
+        permissionsQueryState,
+        permissionsPolicyMicrophone: readPermissionsPolicyMicrophone(),
       }));
 
       if (isMicPermissionDeniedError(error)) {
         setMicPermissionDenied(true);
+        if (permissionsQueryState === "granted" || policyBlocked) {
+          setMicDeniedDespiteSitePermission(true);
+        }
         return false;
       }
 
@@ -459,7 +651,8 @@ export function VoiceMode({ briefing }: { briefing: JarvisBriefing }) {
     micPermissionDenied ||
     Boolean(speechRecognitionError) ||
     debugInfo.lastGetUserMediaResult.startsWith("NotAllowed") ||
-    debugInfo.lastGetUserMediaResult.includes("PermissionDenied");
+    debugInfo.lastGetUserMediaResult.includes("PermissionDenied") ||
+    debugInfo.rawMicTestResult.startsWith("NotAllowed");
 
   return (
     <div className="jarvis-glass mt-4 rounded-xl border border-violet-500/20 p-5">
@@ -521,6 +714,15 @@ export function VoiceMode({ briefing }: { briefing: JarvisBriefing }) {
             )}
           </>
         )}
+        <button
+          type="button"
+          disabled={rawMicTesting}
+          onClick={() => void runRawMicrophoneTest()}
+          className="inline-flex items-center gap-2 rounded-lg border border-cyan-500/40 px-4 py-2.5 text-sm text-cyan-200 hover:bg-cyan-950/40 disabled:opacity-50"
+        >
+          <Mic className="h-4 w-4" />
+          {rawMicTesting ? "Testing mic…" : "Test raw microphone"}
+        </button>
         {showRetry && (
           <button
             type="button"
@@ -533,7 +735,12 @@ export function VoiceMode({ briefing }: { briefing: JarvisBriefing }) {
         )}
       </div>
 
-      {micPermissionDenied && (
+      {micDeniedDespiteSitePermission && (
+        <p className="mt-3 text-sm text-amber-300/90">
+          {NOT_ALLOWED_DESPITE_SITE_PERMISSION}
+        </p>
+      )}
+      {micPermissionDenied && !micDeniedDespiteSitePermission && (
         <p className="mt-3 text-sm text-amber-300/90">
           Microphone permission denied. Allow mic access in Chrome site settings and
           try again.
@@ -549,6 +756,14 @@ export function VoiceMode({ briefing }: { briefing: JarvisBriefing }) {
         <p className="mt-3 text-sm text-red-300/90">
           {ttsError} — text answer is still shown below.
         </p>
+      )}
+
+      {(micPermissionDenied || micDeniedDespiteSitePermission) && (
+        <ul className="mt-3 list-inside list-disc text-xs text-slate-400">
+          {MIC_TROUBLESHOOTING.map((tip) => (
+            <li key={tip}>{tip}</li>
+          ))}
+        </ul>
       )}
 
       {voiceState !== "off" && (
@@ -576,12 +791,18 @@ export function VoiceMode({ briefing }: { briefing: JarvisBriefing }) {
       )}
 
       <div className="mt-4 rounded-lg border border-white/5 bg-black/20 p-3 font-mono text-[11px] leading-relaxed text-slate-500">
+        <p>origin: {debugInfo.origin || "—"}</p>
+        <p>top-level frame: {debugInfo.topLevelFrame ? "yes" : "no (iframe)"}</p>
         <p>secure context: {debugInfo.secureContext ? "yes" : "no"}</p>
         <p>mediaDevices available: {debugInfo.mediaDevicesAvailable ? "yes" : "no"}</p>
         <p>
           SpeechRecognition available:{" "}
           {debugInfo.speechRecognitionAvailable ? "yes" : "no"}
         </p>
+        <p>Permissions-Policy microphone: {debugInfo.permissionsPolicyMicrophone}</p>
+        <p>permissions.query(microphone): {debugInfo.permissionsQueryState}</p>
+        <p>audio inputs: {debugInfo.audioInputDevices}</p>
+        <p>raw mic test: {debugInfo.rawMicTestResult}</p>
         <p>last getUserMedia result: {debugInfo.lastGetUserMediaResult}</p>
         <p>last SpeechRecognition error: {debugInfo.lastSpeechRecognitionError}</p>
       </div>
