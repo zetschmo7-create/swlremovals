@@ -325,8 +325,14 @@ export function TraceLeadPanel({
       <p className="mb-3 text-xs text-slate-500">
         <span className="text-slate-400">Parser test:</span> Carl Hancock (unquoted
         lead).{" "}
-        <span className="text-slate-400">ROI test:</span> Will→3064, Jo→3189,
-        Kevin→2786 (approve then re-trace).
+        <span className="text-slate-400">ROI test:</span> Will → job 3064, Jo → job
+        3189, Kevin → job 2786 (approve then re-trace).
+      </p>
+      <p className="mb-3 text-xs text-slate-600">
+        Acceptance: (1) Carl — parser trace only; confirm full
+        name/email/phone/postcodes. (2) Will → job 3064 — ROI trace; after approve,
+        confirm manually_approved, deposit/value signals, ROI inclusion, and area
+        table for Will&apos;s postcode.
       </p>
 
       <div className="mb-3 flex flex-wrap gap-2">
