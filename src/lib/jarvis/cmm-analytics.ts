@@ -244,6 +244,16 @@ export function buildCmmLeadIntelligenceFromLeads(
     labelFound: false,
     lastSyncAt: null,
     error: null,
+    debug: {
+      labelName: null,
+      labelId: null,
+      messageIdsReturned: 0,
+      messagesFetched: 0,
+      parseSuccesses: 0,
+      parseFailures: 0,
+      duplicatesSkipped: 0,
+      sampleParseFailure: null,
+    },
   };
 
   const needsSetup = leads.length === 0;

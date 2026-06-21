@@ -14,6 +14,18 @@ export type CmmLeadRecord = {
   customer_name: string | null;
   customer_email: string | null;
   customer_phone: string | null;
+  flexible: boolean | null;
+  current_address: string | null;
+  current_postcode: string | null;
+  current_area_prefix: PostcodeArea;
+  bedrooms: number | null;
+  home_type: string | null;
+  new_address: string | null;
+  new_postcode: string | null;
+  additional_services: string | null;
+  additional_information: string | null;
+  number_of_other_companies: number | null;
+  cmm_internal_id: string | null;
   collection_address: string | null;
   collection_postcode: string | null;
   collection_postcode_area: PostcodeArea;
@@ -30,9 +42,15 @@ export type CmmLeadRecord = {
   needs_review_reason: string | null;
 };
 
-export type CmmLeadLedger = {
-  leads: CmmLeadRecord[];
-  version: number;
+export type CmmSyncDebug = {
+  labelName: string | null;
+  labelId: string | null;
+  messageIdsReturned: number;
+  messagesFetched: number;
+  parseSuccesses: number;
+  parseFailures: number;
+  duplicatesSkipped: number;
+  sampleParseFailure: string | null;
 };
 
 export type CmmSyncMeta = {
@@ -44,6 +62,12 @@ export type CmmSyncMeta = {
   labelFound: boolean;
   lastSyncAt: string | null;
   error: string | null;
+  debug: CmmSyncDebug;
+};
+
+export type CmmLeadLedger = {
+  leads: CmmLeadRecord[];
+  version: number;
 };
 
 export type CmmAreaPeriodStats = {
@@ -202,6 +226,7 @@ export type JarvisEmail = {
   body: string;
   labels: string[];
   parsedPdfs: PdfParseResult[];
+  internalDateMs?: number;
 };
 
 export type EmailCategory =

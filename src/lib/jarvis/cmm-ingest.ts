@@ -1,16 +1,22 @@
-import { parseCmmLeadEmail, dedupeCmmLeads } from "./cmm-parser";
-import { fetchAllCmmLabelEmails } from "./cmm-gmail";
+import {
+  parseCmmLeadEmailWithReason,
+  dedupeCmmLeads,
+} from "./cmm-parser";
+import { fetchCmmLabelEmails } from "./cmm-gmail";
 import {
   clearCmmLeadLedger,
   getCmmLeadLedger,
+  getCmmSyncMeta,
   mergeCmmLeads,
   saveCmmLeadLedger,
   saveCmmSyncMeta,
   setCmmLastBackfillAt,
   setCmmLastMessageId,
+  acquireCmmIngestLock,
+  releaseCmmIngestLock,
 } from "./cmm-lead-store";
 import { getJarvisSettings } from "./settings-store";
-import type { CmmLeadLedger, CmmSyncMeta } from "./types";
+import type { CmmLeadLedger, CmmSyncDebug, CmmSyncMeta } from "./types";
 
 export type CmmIngestResult = {
   success: boolean;
@@ -22,34 +28,65 @@ export type CmmIngestResult = {
   lastMessageDate: string | null;
   labelFound: boolean;
   error: string | null;
+  debug: CmmSyncDebug;
 };
 
+function emptyDebug(): CmmSyncDebug {
+  return {
+    labelName: null,
+    labelId: null,
+    messageIdsReturned: 0,
+    messagesFetched: 0,
+    parseSuccesses: 0,
+    parseFailures: 0,
+    duplicatesSkipped: 0,
+    sampleParseFailure: null,
+  };
+}
+
 async function ingestEmails(
+  mode: "rebuild" | "sync"
+): Promise<CmmIngestResult> {
+  await acquireCmmIngestLock(mode);
+
+  try {
+    return await ingestEmailsUnlocked(mode);
+  } finally {
+    await releaseCmmIngestLock();
+  }
+}
+
+async function ingestEmailsUnlocked(
   mode: "rebuild" | "sync"
 ): Promise<CmmIngestResult> {
   const settings = await getJarvisSettings();
   const leadCost = settings.costPerLead;
 
   let existingLedger: CmmLeadLedger | null = null;
-  let afterDate: string | null = null;
+  const existingMessageIds = new Set<string>();
+  let afterInternalDateMs: number | null = null;
 
   if (mode === "sync") {
     existingLedger = await getCmmLeadLedger();
-    const newest = existingLedger?.leads[0]?.received_at;
-    if (newest) {
-      const d = new Date(newest);
-      d.setUTCDate(d.getUTCDate() - 1);
-      afterDate = d.toISOString();
+    for (const lead of existingLedger?.leads ?? []) {
+      existingMessageIds.add(lead.gmail_message_id);
+    }
+    const priorMeta = await getCmmSyncMeta();
+    if (priorMeta?.lastSyncAt) {
+      afterInternalDateMs = new Date(priorMeta.lastSyncAt).getTime() - 86_400_000;
     }
   } else {
     await clearCmmLeadLedger();
   }
 
-  const { emails, labelFound } = await fetchAllCmmLabelEmails({
-    afterDate: mode === "sync" ? afterDate : null,
+  const fetchResult = await fetchCmmLabelEmails({
+    mode,
+    existingMessageIds: mode === "sync" ? existingMessageIds : undefined,
+    afterInternalDateMs: mode === "sync" ? afterInternalDateMs : null,
   });
 
-  if (!labelFound) {
+  if (!fetchResult.labelFound) {
+    const debug = emptyDebug();
     const meta: CmmSyncMeta = {
       messagesScanned: 0,
       leadsParsed: 0,
@@ -59,6 +96,7 @@ async function ingestEmails(
       labelFound: false,
       lastSyncAt: new Date().toISOString(),
       error: "CMM label not found or Gmail access issue.",
+      debug,
     };
     await saveCmmSyncMeta(meta);
     return {
@@ -71,12 +109,27 @@ async function ingestEmails(
       lastMessageDate: null,
       labelFound: false,
       error: meta.error,
+      debug,
     };
   }
 
-  const parsed = emails
-    .map((e) => parseCmmLeadEmail(e, leadCost))
-    .filter((l): l is NonNullable<typeof l> => l !== null);
+  let parseSuccesses = 0;
+  let parseFailures = 0;
+  let sampleParseFailure: string | null = null;
+  const parsed = [];
+
+  for (const email of fetchResult.emails) {
+    const result = parseCmmLeadEmailWithReason(email, leadCost);
+    if (result.lead) {
+      parseSuccesses += 1;
+      parsed.push(result.lead);
+    } else {
+      parseFailures += 1;
+      if (!sampleParseFailure && result.failureReason) {
+        sampleParseFailure = result.failureReason;
+      }
+    }
+  }
 
   const combined =
     mode === "sync" && existingLedger
@@ -85,7 +138,9 @@ async function ingestEmails(
 
   const { unique, duplicatesSkipped } = dedupeCmmLeads(combined);
   const unknownPostcodes = unique.filter(
-    (l) => l.collection_postcode_area === "Unknown"
+    (l) =>
+      l.collection_postcode_area === "Unknown" ||
+      l.current_area_prefix === "Unknown"
   ).length;
 
   const ledger: CmmLeadLedger = { leads: unique, version: 1 };
@@ -101,29 +156,42 @@ async function ingestEmails(
     await setCmmLastBackfillAt(now);
   }
 
+  const debug: CmmSyncDebug = {
+    labelName: fetchResult.labelName,
+    labelId: fetchResult.labelId,
+    messageIdsReturned: fetchResult.messageIdsReturned,
+    messagesFetched: fetchResult.messagesFetched,
+    parseSuccesses,
+    parseFailures,
+    duplicatesSkipped,
+    sampleParseFailure,
+  };
+
   const lastMessageDate = newest?.received_at ?? null;
   const meta: CmmSyncMeta = {
-    messagesScanned: emails.length,
-    leadsParsed: parsed.length,
+    messagesScanned: fetchResult.messageIdsReturned,
+    leadsParsed: parseSuccesses,
     duplicatesSkipped,
     unknownPostcodes,
     lastMessageDate,
     labelFound: true,
     lastSyncAt: now,
     error: null,
+    debug,
   };
   await saveCmmSyncMeta(meta);
 
   return {
     success: true,
-    messagesScanned: emails.length,
-    leadsParsed: parsed.length,
+    messagesScanned: fetchResult.messageIdsReturned,
+    leadsParsed: parseSuccesses,
     duplicatesSkipped,
     unknownPostcodes,
     totalLeads: unique.length,
     lastMessageDate,
     labelFound: true,
     error: null,
+    debug,
   };
 }
 

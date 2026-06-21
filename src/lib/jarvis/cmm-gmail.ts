@@ -9,20 +9,44 @@ function decodeBase64Url(data: string): string {
   return Buffer.from(normalized, "base64").toString("utf8");
 }
 
-function extractBody(payload: gmail_v1.Schema$MessagePart | undefined): string {
-  if (!payload) return "";
-  if (payload.body?.data) return decodeBase64Url(payload.body.data);
-  const parts = payload.parts ?? [];
-  const plain = parts.find((p) => p.mimeType === "text/plain");
-  if (plain?.body?.data) return decodeBase64Url(plain.body.data);
-  const html = parts.find((p) => p.mimeType === "text/html");
-  if (html?.body?.data) {
-    return decodeBase64Url(html.body.data)
-      .replace(/<[^>]+>/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
+function stripHtml(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extractBodies(
+  payload: gmail_v1.Schema$MessagePart | undefined
+): { plain: string; html: string } {
+  if (!payload) return { plain: "", html: "" };
+
+  let plain = "";
+  let html = "";
+
+  if (payload.mimeType === "text/plain" && payload.body?.data) {
+    plain += decodeBase64Url(payload.body.data);
+  } else if (payload.mimeType === "text/html" && payload.body?.data) {
+    html += decodeBase64Url(payload.body.data);
   }
-  return parts.map((part) => extractBody(part)).join("\n");
+
+  for (const part of payload.parts ?? []) {
+    const child = extractBodies(part);
+    plain += child.plain;
+    html += child.html;
+  }
+
+  return { plain, html };
+}
+
+function extractBody(payload: gmail_v1.Schema$MessagePart | undefined): string {
+  const { plain, html } = extractBodies(payload);
+  if (plain.trim()) return plain.trim();
+  if (html.trim()) return stripHtml(html);
+  return "";
 }
 
 function getHeader(
@@ -39,6 +63,24 @@ async function buildLabelMap(gmail: gmail_v1.Gmail): Promise<Map<string, string>
     if (label.id && label.name) map.set(label.id, label.name);
   }
   return map;
+}
+
+export type CmmLabelInfo = {
+  id: string;
+  name: string;
+};
+
+export async function resolveCmmLabel(
+  gmail: gmail_v1.Gmail
+): Promise<CmmLabelInfo | null> {
+  const res = await gmail.users.labels.list({ userId: "me" });
+  const exact = (res.data.labels ?? []).find(
+    (label) => label.name === JARVIS_CONFIG.cmmLeadLabel && label.id
+  );
+  if (exact?.id && exact.name) {
+    return { id: exact.id, name: exact.name };
+  }
+  return null;
 }
 
 function mapMessage(
@@ -59,12 +101,24 @@ function mapMessage(
     body: extractBody(message.payload),
     labels,
     parsedPdfs: [],
+    internalDateMs: message.internalDate
+      ? Number(message.internalDate)
+      : undefined,
   };
 }
 
 export type CmmFetchProgress = {
   pagesFetched: number;
   messageIdsFound: number;
+  messagesFetched: number;
+};
+
+export type CmmFetchResult = {
+  emails: JarvisEmail[];
+  labelFound: boolean;
+  labelName: string | null;
+  labelId: string | null;
+  messageIdsReturned: number;
   messagesFetched: number;
 };
 
@@ -80,40 +134,35 @@ async function getMainGmailClient(): Promise<gmail_v1.Gmail | null> {
 export async function verifyCmmLabelExists(): Promise<boolean> {
   const gmail = await getMainGmailClient();
   if (!gmail) return false;
-  const res = await gmail.users.labels.list({ userId: "me" });
-  return (res.data.labels ?? []).some(
-    (l) => l.name?.toLowerCase() === JARVIS_CONFIG.cmmLeadLabel.toLowerCase()
-  );
+  const label = await resolveCmmLabel(gmail);
+  return label !== null;
 }
 
-function formatGmailAfterDate(iso: string): string {
-  const d = new Date(iso);
-  const y = d.getUTCFullYear();
-  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(d.getUTCDate()).padStart(2, "0");
-  return `${y}/${m}/${day}`;
-}
-
-export async function fetchAllCmmLabelEmails(options?: {
-  afterDate?: string | null;
+export async function fetchCmmLabelEmails(options?: {
+  mode?: "rebuild" | "sync";
+  existingMessageIds?: Set<string>;
+  afterInternalDateMs?: number | null;
   onProgress?: (progress: CmmFetchProgress) => void;
-}): Promise<{ emails: JarvisEmail[]; labelFound: boolean }> {
-  const gmail = await getMainGmailClient();
-  if (!gmail) {
-    return { emails: [], labelFound: false };
-  }
+}): Promise<CmmFetchResult> {
+  const empty: CmmFetchResult = {
+    emails: [],
+    labelFound: false,
+    labelName: null,
+    labelId: null,
+    messageIdsReturned: 0,
+    messagesFetched: 0,
+  };
 
-  const labelFound = await verifyCmmLabelExists();
-  if (!labelFound) {
-    return { emails: [], labelFound: false };
-  }
+  const gmail = await getMainGmailClient();
+  if (!gmail) return empty;
+
+  const cmmLabel = await resolveCmmLabel(gmail);
+  if (!cmmLabel) return empty;
 
   const labelMap = await buildLabelMap(gmail);
-  const cmmLabel = JARVIS_CONFIG.cmmLeadLabel.replace(/"/g, '\\"');
-  let query = `label:"${cmmLabel}"`;
-  if (options?.afterDate) {
-    query += ` after:${formatGmailAfterDate(options.afterDate)}`;
-  }
+  const existingIds = options?.existingMessageIds ?? new Set<string>();
+  const afterMs = options?.afterInternalDateMs ?? null;
+  const isSync = options?.mode === "sync";
 
   const messageIds: string[] = [];
   let pageToken: string | undefined;
@@ -122,14 +171,16 @@ export async function fetchAllCmmLabelEmails(options?: {
   do {
     const list = await gmail.users.messages.list({
       userId: "me",
-      q: query,
+      labelIds: [cmmLabel.id],
       maxResults: 500,
       pageToken,
     });
     pagesFetched += 1;
+
     for (const m of list.data.messages ?? []) {
       if (m.id) messageIds.push(m.id);
     }
+
     pageToken = list.data.nextPageToken ?? undefined;
     options?.onProgress?.({
       pagesFetched,
@@ -138,11 +189,16 @@ export async function fetchAllCmmLabelEmails(options?: {
     });
   } while (pageToken);
 
+  let idsToFetch = messageIds;
+  if (isSync) {
+    idsToFetch = messageIds.filter((id) => !existingIds.has(id));
+  }
+
   const emails: JarvisEmail[] = [];
   const batchSize = 25;
 
-  for (let i = 0; i < messageIds.length; i += batchSize) {
-    const batch = messageIds.slice(i, i + batchSize);
+  for (let i = 0; i < idsToFetch.length; i += batchSize) {
+    const batch = idsToFetch.slice(i, i + batchSize);
     const results = await Promise.all(
       batch.map(async (id) => {
         const full = await gmail.users.messages.get({
@@ -150,10 +206,26 @@ export async function fetchAllCmmLabelEmails(options?: {
           id,
           format: "full",
         });
-        return mapMessage(full.data, labelMap);
+        return full.data;
       })
     );
-    emails.push(...results);
+
+    for (const message of results) {
+      if (!message.id) continue;
+      const internalDateMs = message.internalDate
+        ? Number(message.internalDate)
+        : 0;
+      if (
+        isSync &&
+        afterMs != null &&
+        internalDateMs > 0 &&
+        internalDateMs <= afterMs
+      ) {
+        continue;
+      }
+      emails.push(mapMessage(message, labelMap));
+    }
+
     options?.onProgress?.({
       pagesFetched,
       messageIdsFound: messageIds.length,
@@ -161,6 +233,30 @@ export async function fetchAllCmmLabelEmails(options?: {
     });
   }
 
-  emails.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  return { emails, labelFound: true };
+  emails.sort((a, b) => {
+    const da = a.internalDateMs ?? new Date(a.date).getTime();
+    const db = b.internalDateMs ?? new Date(b.date).getTime();
+    return db - da;
+  });
+
+  return {
+    emails,
+    labelFound: true,
+    labelName: cmmLabel.name,
+    labelId: cmmLabel.id,
+    messageIdsReturned: messageIds.length,
+    messagesFetched: emails.length,
+  };
+}
+
+/** @deprecated Use fetchCmmLabelEmails */
+export async function fetchAllCmmLabelEmails(options?: {
+  afterDate?: string | null;
+  onProgress?: (progress: CmmFetchProgress) => void;
+}): Promise<{ emails: JarvisEmail[]; labelFound: boolean }> {
+  const result = await fetchCmmLabelEmails({
+    mode: "rebuild",
+    onProgress: options?.onProgress,
+  });
+  return { emails: result.emails, labelFound: result.labelFound };
 }

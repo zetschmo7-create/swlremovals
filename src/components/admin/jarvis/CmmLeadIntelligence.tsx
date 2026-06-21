@@ -41,6 +41,9 @@ export function CmmLeadIntelligencePanel({
           const json = (await res.json()) as { intelligence: CmmLeadIntelligence };
           setLocalIntel(json.intelligence);
           onRefresh?.();
+        } else {
+          const json = (await res.json()) as { error?: string };
+          alert(json.error ?? "CMM ingest failed");
         }
       } finally {
         setBusy(null);
@@ -69,6 +72,16 @@ export function CmmLeadIntelligencePanel({
         : data.monthlyChart;
 
   const meta = data.syncMeta;
+  const debug = meta.debug ?? {
+    labelName: null,
+    labelId: null,
+    messageIdsReturned: meta.messagesScanned,
+    messagesFetched: 0,
+    parseSuccesses: meta.leadsParsed,
+    parseFailures: 0,
+    duplicatesSkipped: meta.duplicatesSkipped,
+    sampleParseFailure: null,
+  };
   const lastSync = meta.lastSyncAt
     ? new Date(meta.lastSyncAt).toLocaleString("en-GB")
     : "Never";
@@ -140,6 +153,35 @@ export function CmmLeadIntelligencePanel({
           <StatusRow label="Duplicates skipped" value={meta.duplicatesSkipped} />
           <StatusRow label="Unknown postcodes" value={meta.unknownPostcodes} />
         </dl>
+      </div>
+
+      <div className="jarvis-glass mb-6 rounded-xl p-4">
+        <p className="mb-3 text-xs uppercase tracking-widest text-cyan-400/80">
+          Gmail sync debug
+        </p>
+        <dl className="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
+          <StatusRow label="Label name found" value={debug.labelName ?? "—"} />
+          <StatusRow label="Label ID used" value={debug.labelId ?? "—"} />
+          <StatusRow
+            label="Message IDs returned"
+            value={debug.messageIdsReturned}
+          />
+          <StatusRow label="Messages fetched" value={debug.messagesFetched} />
+          <StatusRow label="Parse successes" value={debug.parseSuccesses} />
+          <StatusRow label="Parse failures" value={debug.parseFailures} />
+          <StatusRow label="Duplicate skips" value={debug.duplicatesSkipped} />
+          <StatusRow label="Gmail label status" value={meta.labelFound ? "Found" : "Not found"} />
+        </dl>
+        {debug.sampleParseFailure && (
+          <p className="mt-3 text-xs text-amber-300/90">
+            Sample parse failure: {debug.sampleParseFailure}
+          </p>
+        )}
+        {!meta.lastSyncAt && (
+          <p className="mt-3 text-xs text-slate-500">
+            Run Rebuild to populate debug stats from Gmail.
+          </p>
+        )}
       </div>
 
       <div className="jarvis-glass mb-6 overflow-x-auto rounded-xl">

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getJarvisSession } from "@/lib/jarvis/auth";
 import { rebuildCmmLeadLedger, syncNewCmmLeads } from "@/lib/jarvis/cmm-ingest";
+import { CmmIngestLockedError } from "@/lib/jarvis/cmm-lead-store";
 import { loadCmmLeadIntelligence } from "@/lib/jarvis/cmm-analytics";
 import { getJarvisSettings } from "@/lib/jarvis/settings-store";
 import { fetchJarvisEmails } from "@/lib/jarvis/gmail";
@@ -63,6 +64,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ingest: result, intelligence });
   } catch (error) {
+    if (error instanceof CmmIngestLockedError) {
+      return NextResponse.json({ error: error.message }, { status: 409 });
+    }
     const message = error instanceof Error ? error.message : "CMM ingest failed";
     return NextResponse.json({ error: message }, { status: 500 });
   }
