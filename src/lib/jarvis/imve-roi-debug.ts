@@ -5,7 +5,7 @@ import type {
   ImveRoiEligibilityDebug,
   ImveRoiMatchEvaluation,
 } from "./imve-types";
-import { isImveMatchUsableForRoi } from "./imve-cmm-match";
+import { isImveMatchUsableForRoi, hasImveDepositValueSignal } from "./imve-cmm-match";
 
 export type {
   ImveRoiEligibilityDebug,
@@ -29,15 +29,7 @@ function hasDepositSignal(
   match: ImveCmmLeadMatch,
   job: ImveJobRecord
 ): boolean {
-  return (
-    match.deposit_paid ||
-    job.deposit_paid ||
-    (job.deposit_amount ?? 0) > 0
-  );
-}
-
-function hasValueSignal(job: ImveJobRecord): boolean {
-  return turnoverFromJob(job) > 0;
+  return match.deposit_paid || hasImveDepositValueSignal(job);
 }
 
 export function evaluateImveMatchForRoi(
@@ -125,7 +117,7 @@ export function evaluateImveMatchForRoi(
   }
 
   const deposit = hasDepositSignal(match, job);
-  const value = hasValueSignal(job);
+  const value = turnoverFromJob(job) > 0;
 
   if (!deposit && !value) {
     return {

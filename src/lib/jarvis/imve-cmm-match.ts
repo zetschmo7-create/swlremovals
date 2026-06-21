@@ -9,8 +9,11 @@ import type { CmmLeadRecord } from "./types";
 import { normalizePhone } from "./cmm-match-scoring";
 import { extractPostcodeArea, parseEmailDate } from "./extractors";
 
+/** @deprecated Score thresholds replaced by rule-based classify; kept for debug display */
 const AUTO_MATCH = 85;
 const REVIEW_MIN = 55;
+const AMBIGUITY_SCORE_GAP = 12;
+const STRONG_NAME_SIM = 0.88;
 
 function normalizePostcode(pc: string | null): string {
   return (pc ?? "").replace(/\s+/g, "").toUpperCase();
@@ -22,6 +25,10 @@ function normalizeName(name: string | null): string {
     .replace(/[^a-z0-9\s]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function nameParts(name: string | null): string[] {
+  return normalizeName(name).split(" ").filter(Boolean);
 }
 
 function nameSimilarity(a: string | null, b: string | null): number {
@@ -39,6 +46,46 @@ function nameSimilarity(a: string | null, b: string | null): number {
   return overlap / Math.max(ta.size, tb.size);
 }
 
+function isStrongNameMatch(
+  leadName: string | null,
+  jobName: string | null,
+  nameSim: number
+): boolean {
+  if (nameSim >= 0.95) return true;
+  const lp = nameParts(leadName);
+  const jp = nameParts(jobName);
+  if (lp.length >= 2 && jp.length >= 2) {
+    if (lp[0] === jp[0] && lp[lp.length - 1] === jp[jp.length - 1]) return true;
+  }
+  return nameSim >= STRONG_NAME_SIM;
+}
+
+function isFirstNameOnlyMatch(
+  leadName: string | null,
+  jobName: string | null,
+  nameStrong: boolean
+): boolean {
+  if (nameStrong) return false;
+  const lp = nameParts(leadName);
+  const jp = nameParts(jobName);
+  if (lp.length === 0 || jp.length === 0) return false;
+  return lp[0] === jp[0];
+}
+
+export function hasImveDepositValueSignal(job: ImveJobRecord): boolean {
+  return (
+    job.deposit_paid ||
+    (job.deposit_amount ?? 0) > 0 ||
+    (job.turnover ?? 0) > 0 ||
+    (job.quote_value ?? 0) > 0
+  );
+}
+
+function hasCmmSourceSignal(lead: CmmLeadRecord, job: ImveJobRecord): boolean {
+  const src = `${lead.lead_source} ${job.lead_source ?? ""}`.toLowerCase();
+  return /cmm|compare\s*my\s*move|comparemymove/.test(src);
+}
+
 function moveDateScore(leadDate: string | null, jobDate: string | null): number {
   const a = leadDate ? parseEmailDate(leadDate)?.getTime() : null;
   const b = jobDate ? parseEmailDate(jobDate)?.getTime() : null;
@@ -50,10 +97,113 @@ function moveDateScore(leadDate: string | null, jobDate: string | null): number 
   return 0;
 }
 
-function leadSourceScore(lead: CmmLeadRecord, job: ImveJobRecord): number {
-  const src = `${lead.lead_source} ${job.lead_source ?? ""}`.toLowerCase();
-  if (/cmm|compare\s*my\s*move|comparemymove/.test(src)) return 8;
-  return 0;
+export type ImveMatchSignals = {
+  email_exact: boolean;
+  phone_exact: boolean;
+  name_strong: boolean;
+  name_fuzzy: boolean;
+  name_first_only: boolean;
+  postcode_exact: boolean;
+  postcode_area: boolean;
+  cmm_source: boolean;
+  has_deposit_value: boolean;
+};
+
+export type ImveMatchEvaluation = {
+  score: number;
+  reasons: string[];
+  signals: ImveMatchSignals;
+  decision: "auto_matched" | "needs_review" | "unmatched";
+  decision_reason: string;
+};
+
+function decideImveMatch(
+  signals: ImveMatchSignals,
+  score: number
+): Pick<ImveMatchEvaluation, "decision" | "decision_reason"> {
+  if (signals.email_exact) {
+    return { decision: "auto_matched", decision_reason: "auto_email_exact" };
+  }
+  if (signals.phone_exact) {
+    return { decision: "auto_matched", decision_reason: "auto_phone_exact" };
+  }
+  if (signals.name_strong && signals.postcode_exact) {
+    return { decision: "auto_matched", decision_reason: "auto_name_postcode_exact" };
+  }
+  if (
+    signals.name_strong &&
+    signals.postcode_area &&
+    signals.has_deposit_value &&
+    signals.cmm_source
+  ) {
+    return {
+      decision: "auto_matched",
+      decision_reason: "auto_name_area_deposit_cmm",
+    };
+  }
+
+  if (
+    signals.postcode_area &&
+    !signals.name_strong &&
+    !signals.name_fuzzy &&
+    !signals.name_first_only &&
+    !signals.email_exact &&
+    !signals.phone_exact
+  ) {
+    return { decision: "unmatched", decision_reason: "postcode_area_only" };
+  }
+
+  if (
+    signals.name_fuzzy &&
+    !signals.postcode_exact &&
+    !signals.email_exact &&
+    !signals.phone_exact &&
+    !signals.name_strong
+  ) {
+    return { decision: "unmatched", decision_reason: "fuzzy_name_only" };
+  }
+
+  if (
+    !signals.email_exact &&
+    !signals.phone_exact &&
+    !signals.name_strong &&
+    !signals.name_fuzzy &&
+    !signals.name_first_only
+  ) {
+    return { decision: "unmatched", decision_reason: "no_name_match" };
+  }
+
+  if (signals.name_strong && signals.postcode_area) {
+    return {
+      decision: "needs_review",
+      decision_reason: "name_area_missing_deposit_or_cmm",
+    };
+  }
+
+  if (signals.name_fuzzy && (signals.postcode_exact || signals.postcode_area)) {
+    return {
+      decision: "needs_review",
+      decision_reason: "fuzzy_name_with_postcode",
+    };
+  }
+
+  if (signals.name_first_only && signals.postcode_area) {
+    return {
+      decision: "needs_review",
+      decision_reason: "first_name_area_weak",
+    };
+  }
+
+  if (
+    signals.email_exact ||
+    signals.phone_exact ||
+    signals.name_strong ||
+    score >= REVIEW_MIN
+  ) {
+    return { decision: "needs_review", decision_reason: "plausible_partial_match" };
+  }
+
+  return { decision: "unmatched", decision_reason: "below_review_threshold" };
 }
 
 export function scoreImveLeadMatch(
@@ -116,55 +266,147 @@ export function scoreImveLeadMatch(
     reasons.push("move_date_proximity");
   }
 
-  const sourceScore = leadSourceScore(lead, job);
-  score += sourceScore;
-  if (sourceScore > 0) reasons.push("lead_source_cmm");
+  if (hasCmmSourceSignal(lead, job)) {
+    score += 8;
+    reasons.push("lead_source_cmm");
+  }
 
   if (job.deposit_paid) {
     score += 3;
     reasons.push("imve_deposit_paid");
   }
 
+  if (hasImveDepositValueSignal(job)) {
+    reasons.push("deposit_or_value_signal");
+  }
+
   return { score: Math.min(score, 100), reasons };
 }
 
-function classifyImveScore(score: number): ImveCmmLeadMatch["match_status"] {
-  if (score >= AUTO_MATCH) return "auto_matched";
-  if (score >= REVIEW_MIN) return "needs_review";
-  return "unmatched";
+export function evaluateImveLeadMatch(
+  lead: CmmLeadRecord,
+  job: ImveJobRecord
+): ImveMatchEvaluation {
+  const { score, reasons } = scoreImveLeadMatch(lead, job);
+
+  const leadEmail = lead.customer_email?.toLowerCase();
+  const jobEmail = job.customer_email?.toLowerCase();
+  const email_exact = Boolean(leadEmail && jobEmail && leadEmail === jobEmail);
+
+  const leadPhone = normalizePhone(lead.customer_phone);
+  const jobPhone = normalizePhone(job.customer_phone);
+  const phone_exact = Boolean(leadPhone && jobPhone && leadPhone === jobPhone);
+
+  const nameSim = nameSimilarity(lead.customer_name, job.customer_name);
+  const name_strong = isStrongNameMatch(
+    lead.customer_name,
+    job.customer_name,
+    nameSim
+  );
+  const name_fuzzy = nameSim >= 0.65 && !name_strong;
+  const name_first_only = isFirstNameOnlyMatch(
+    lead.customer_name,
+    job.customer_name,
+    name_strong
+  );
+
+  const leadPc = normalizePostcode(
+    lead.collection_postcode ?? lead.current_postcode
+  );
+  const jobPc = normalizePostcode(job.from_postcode);
+  const postcode_exact = Boolean(leadPc && jobPc && leadPc === jobPc);
+
+  const leadArea = extractPostcodeArea(
+    lead.collection_postcode ?? lead.current_postcode
+  );
+  const jobArea = job.from_area ?? extractPostcodeArea(job.from_postcode);
+  const postcode_area = Boolean(
+    !postcode_exact &&
+      leadArea &&
+      jobArea &&
+      leadArea !== "Unknown" &&
+      jobArea !== "Unknown" &&
+      leadArea === jobArea
+  );
+
+  const signals: ImveMatchSignals = {
+    email_exact,
+    phone_exact,
+    name_strong,
+    name_fuzzy,
+    name_first_only,
+    postcode_exact,
+    postcode_area,
+    cmm_source: hasCmmSourceSignal(lead, job),
+    has_deposit_value: hasImveDepositValueSignal(job),
+  };
+
+  const { decision, decision_reason } = decideImveMatch(signals, score);
+
+  return { score, reasons, signals, decision, decision_reason };
+}
+
+function resolveMatchStatus(
+  ranked: Array<ImveMatchEvaluation & { job: ImveJobRecord }>
+): { status: ImveMatchEvaluation["decision"]; reason: string } {
+  const top = ranked[0];
+  let status = top.decision;
+  let reason = `${top.decision_reason}; ${top.reasons.join(", ")}`;
+
+  if (ranked.length >= 2) {
+    const second = ranked[1];
+    if (second.decision !== "unmatched") {
+      const gap = top.score - second.score;
+      if (
+        gap <= AMBIGUITY_SCORE_GAP &&
+        (top.decision === "auto_matched" || second.decision === "auto_matched")
+      ) {
+        status = "needs_review";
+        reason = `ambiguous_match; ${reason}`;
+      }
+    }
+  }
+
+  return { status, reason };
 }
 
 export function rankImveCandidatesForLead(
   lead: CmmLeadRecord,
   jobs: ImveJobRecord[],
   limit = 3
-): Array<{ job: ImveJobRecord; score: number; reasons: string[] }> {
+): Array<{
+  job: ImveJobRecord;
+  score: number;
+  reasons: string[];
+  decision: ImveMatchEvaluation["decision"];
+  decision_reason: string;
+}> {
   return jobs
-    .map((job) => ({ job, ...scoreImveLeadMatch(lead, job) }))
+    .map((job) => ({ job, ...evaluateImveLeadMatch(lead, job) }))
+    .filter((c) => c.decision !== "unmatched")
     .sort((a, b) => b.score - a.score)
-    .slice(0, limit);
+    .slice(0, limit)
+    .map(({ job, score, reasons, decision, decision_reason }) => ({
+      job,
+      score,
+      reasons,
+      decision,
+      decision_reason,
+    }));
 }
 
 export function explainImveMatchDecision(
   lead: CmmLeadRecord,
   topCandidate: { job: ImveJobRecord; score: number; reasons: string[] }
 ): string {
-  const status = classifyImveScore(topCandidate.score);
+  const evaluation = evaluateImveLeadMatch(lead, topCandidate.job);
   const parts = [
-    `Score ${topCandidate.score}/100 → ${status}`,
-    `Signals: ${topCandidate.reasons.join(", ") || "none"}`,
+    `${evaluation.decision} (${evaluation.decision_reason})`,
+    `Score ${evaluation.score}/100`,
+    `Signals: ${evaluation.reasons.join(", ") || "none"}`,
     `Lead: ${lead.customer_name ?? "?"} (${lead.customer_email ?? "no email"})`,
     `Job: ${topCandidate.job.customer_name ?? "?"} (${topCandidate.job.job_reference ?? topCandidate.job.imve_id})`,
   ];
-  if (status === "auto_matched") {
-    parts.push(`Met auto-match threshold (${AUTO_MATCH}).`);
-  } else if (status === "needs_review") {
-    parts.push(
-      `Below auto-match (${AUTO_MATCH}) but above review minimum (${REVIEW_MIN}).`
-    );
-  } else {
-    parts.push(`Below review minimum (${REVIEW_MIN}).`);
-  }
   return parts.join(" · ");
 }
 
@@ -184,7 +426,10 @@ export function runImveCmmMatching(
     }
   }
 
-  for (const lead of leads) {
+  const approvedLeads = leads.filter((l) => approved.has(l.gmail_message_id));
+  const otherLeads = leads.filter((l) => !approved.has(l.gmail_message_id));
+
+  for (const lead of [...approvedLeads, ...otherLeads]) {
     const leadId = lead.gmail_message_id;
     const approvedJobId = approved.get(leadId);
     if (approvedJobId) {
@@ -198,8 +443,8 @@ export function runImveCmmMatching(
 
     const ranked = imveJobs
       .filter((j) => !usedJobs.has(j.imve_id))
-      .map((job) => ({ job, ...scoreImveLeadMatch(lead, job) }))
-      .filter((c) => c.score >= REVIEW_MIN)
+      .map((job) => ({ job, ...evaluateImveLeadMatch(lead, job) }))
+      .filter((c) => c.decision !== "unmatched")
       .sort((a, b) => b.score - a.score);
 
     const top = ranked[0];
@@ -208,8 +453,7 @@ export function runImveCmmMatching(
       continue;
     }
 
-    const status = classifyImveScore(top.score);
-    const reason = top.reasons.join(", ");
+    const { status, reason } = resolveMatchStatus(ranked);
 
     if (status === "auto_matched") {
       matches[leadId] = buildMatch(lead, top.job, top.score, reason, "auto_matched");

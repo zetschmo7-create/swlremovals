@@ -5,8 +5,9 @@ import {
 } from "./cmm-gmail";
 import { parseCmmLeadEmailWithReason } from "./cmm-parser";
 import {
+  evaluateImveLeadMatch,
   explainImveMatchDecision,
-  scoreImveLeadMatch,
+  REVIEW_MIN,
 } from "./imve-cmm-match";
 import { getImveCmmMatchLedger } from "./imve-cmm-match-store";
 import { evaluateImveMatchForRoi } from "./imve-roi-debug";
@@ -29,8 +30,7 @@ import {
   type RoiTraceCandidate,
 } from "./trace-lead-candidates";
 
-const AUTO_MATCH = 85;
-const REVIEW_MIN = 55;
+const REVIEW_MIN_EXPORT = REVIEW_MIN;
 
 export type LeadTraceFieldRow = {
   field: string;
@@ -262,10 +262,10 @@ function findImveJob(
   return jobs.find((j) => jobMatchesQuery(j, query)) ?? null;
 }
 
-function classifyImveScore(score: number): ImveCmmLeadMatch["match_status"] {
-  if (score >= AUTO_MATCH) return "auto_matched";
-  if (score >= REVIEW_MIN) return "needs_review";
-  return "unmatched";
+function classifyImveScore(
+  evaluation: ReturnType<typeof evaluateImveLeadMatch>
+): ImveCmmLeadMatch["match_status"] {
+  return evaluation.decision;
 }
 
 function fieldMismatches(
@@ -347,7 +347,7 @@ function buildDiagnosis(report: Omit<LeadTraceReport, "diagnosis">): string {
 
   if (report.step6_match.predicted_status === "unmatched") {
     issues.push(
-      `Match score ${report.step6_match.score} below review minimum (${REVIEW_MIN}) — ${report.step6_match.reason_if_not_matched}`
+      `Match unmatched — ${report.step6_match.reason_if_not_matched}`
     );
   } else if (report.step6_match.stored_match_status === "none") {
     issues.push("No stored i-MVE match — run Rematch i-MVE → CMM.");
@@ -359,7 +359,10 @@ function buildDiagnosis(report: Omit<LeadTraceReport, "diagnosis">): string {
     issues.push("Match was rejected — will not count toward ROI.");
   } else if (report.step_approval.is_manually_approved) {
     // expected after approval — no issue
-  } else if (!report.step_approval.is_auto_matched && report.step6_match.score >= REVIEW_MIN) {
+  } else if (
+    !report.step_approval.is_auto_matched &&
+    report.step6_match.predicted_status === "needs_review"
+  ) {
     issues.push("Match should be in review queue or approved but status is unclear.");
   }
 
@@ -571,16 +574,17 @@ export async function traceLead(query: string): Promise<LeadTraceReport> {
     candidate_job_reference: storedMatchRecord?.candidate_job_reference ?? null,
     linked_job_reference: storedMatchRecord?.job_reference ?? null,
     reason_if_not_matched: "No CMM lead available for matching",
-    thresholds: { auto_matched: AUTO_MATCH, needs_review: REVIEW_MIN },
+    thresholds: { auto_matched: 0, needs_review: REVIEW_MIN_EXPORT },
     explanation: null,
   };
 
   if (leadForMatch && job) {
-    const { score, reasons } = scoreImveLeadMatch(leadForMatch, job);
-    const predicted = classifyImveScore(score);
+    const evaluation = evaluateImveLeadMatch(leadForMatch, job);
+    const { score, reasons } = evaluation;
+    const predicted = classifyImveScore(evaluation);
     const storedMatch = storedMatchRecord;
-    let reason = "";
-    if (score < REVIEW_MIN) {
+    let reason = evaluation.decision_reason;
+    if (evaluation.decision === "unmatched") {
       const missing: string[] = [];
       if (!leadForMatch.customer_email && !leadForMatch.customer_phone) {
         missing.push("lead has no email or phone for strong match");
@@ -588,10 +592,10 @@ export async function traceLead(query: string): Promise<LeadTraceReport> {
       if (!reasons.includes("email_exact") && !reasons.includes("phone_exact")) {
         missing.push("no email/phone exact match");
       }
-      if (!reasons.includes("name_exact") && !reasons.includes("name_fuzzy")) {
+      if (!evaluation.signals.name_strong && !evaluation.signals.name_fuzzy) {
         missing.push("weak name match");
       }
-      reason = missing.join("; ") || `score ${score} below ${REVIEW_MIN}`;
+      reason = missing.join("; ") || evaluation.decision_reason;
     }
     matchStep = {
       score,
@@ -603,7 +607,10 @@ export async function traceLead(query: string): Promise<LeadTraceReport> {
         storedMatch?.candidate_job_reference ?? job.job_reference,
       linked_job_reference: storedMatch?.job_reference ?? job.job_reference,
       reason_if_not_matched: reason,
-      thresholds: { auto_matched: AUTO_MATCH, needs_review: REVIEW_MIN },
+      thresholds: {
+        auto_matched: 0,
+        needs_review: REVIEW_MIN_EXPORT,
+      },
       explanation: explainImveMatchDecision(leadForMatch, { job, score, reasons }),
     };
   }
