@@ -187,6 +187,19 @@ export type CmmLeadIntelligence = {
   matchStats: CmmMatchStats;
   reviewQueue: CmmMatchReviewItem[];
   unmatchedDepositJobs: CmmUnmatchedDepositJob[];
+  imveImportSummary: {
+    jobCount: number;
+    depositPaidCount: number;
+    matchStats: {
+      autoMatched: number;
+      needsReview: number;
+      unmatched: number;
+      totalLeads: number;
+      totalImveJobs: number;
+      lastMatchedAt: string | null;
+    };
+    usingImveForRoi: boolean;
+  } | null;
   needsSetup: boolean;
   setupMessage: string | null;
 };

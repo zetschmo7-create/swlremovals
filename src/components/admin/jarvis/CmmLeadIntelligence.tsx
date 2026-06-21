@@ -148,6 +148,13 @@ export function CmmLeadIntelligencePanel({
       title="CMM Lead Intelligence"
       subtitle="Source: Gmail label “CMM - New Lead” on info@ryanremovals.com"
     >
+      {data.imveImportSummary?.usingImveForRoi && (
+        <div className="jarvis-glass mb-4 rounded-xl border border-emerald-500/25 bg-emerald-500/10 p-4 text-sm text-emerald-200">
+          Area ROI uses matched i-MVE data ({data.imveImportSummary.depositPaidCount}{" "}
+          deposit-paid jobs from import).
+        </div>
+      )}
+
       {data.needsSetup && (
         <div className="jarvis-glass mb-4 rounded-xl border border-amber-500/25 bg-amber-500/10 p-4 text-sm text-amber-200">
           {data.setupMessage ?? "CMM lead ledger needs a full backfill."}

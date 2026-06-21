@@ -21,6 +21,12 @@ import {
 } from "./cmm-match";
 import { getJobsForCmmMatching } from "./jarvis-jobs";
 import { parseEmailDate } from "./extractors";
+import { getImveImportLedgerOrEmpty } from "./imve-store";
+import { isImveRoiActive } from "./imve-validate";
+import { getImveCmmMatchLedger } from "./imve-cmm-match-store";
+import { isImveMatchUsableForRoi } from "./imve-cmm-match";
+import { imveJobToJobRecord } from "./imve-to-job";
+import type { ImveCmmLeadMatch, ImveJobRecord } from "./imve-types";
 
 const ALL_AREAS: PostcodeArea[] = ["GU", "RH", "TN", "SM", "CR", "Other", "Unknown"];
 
@@ -125,10 +131,36 @@ function collectMatchedJobsForArea(
   return matched;
 }
 
+function collectImveMatchedJobsForArea(
+  areaLeads: CmmLeadRecord[],
+  matches: Record<string, ImveCmmLeadMatch>,
+  imveJobs: ImveJobRecord[]
+): JobRecord[] {
+  const seen = new Set<string>();
+  const matched: JobRecord[] = [];
+  const jobById = new Map(imveJobs.map((j) => [j.imve_id, j]));
+
+  for (const lead of areaLeads) {
+    const match = matches[lead.gmail_message_id];
+    if (!isImveMatchUsableForRoi(match) || !match?.imve_job_id) continue;
+    const imveJob = jobById.get(match.imve_job_id);
+    if (!imveJob) continue;
+    const job = imveJobToJobRecord(imveJob);
+    if (seen.has(job.job_key)) continue;
+    seen.add(job.job_key);
+    matched.push(job);
+  }
+
+  return matched;
+}
+
 function buildAreaAnalytics(
   areaLeads: CmmLeadRecord[],
   matches: Record<string, CmmLeadMatch>,
   jobs: JobRecord[],
+  imveMatches: Record<string, ImveCmmLeadMatch> | null,
+  imveJobs: ImveJobRecord[],
+  useImveRoi: boolean,
   cost: number,
   now: Date
 ): CmmAreaAnalytics {
@@ -140,8 +172,14 @@ function buildAreaAnalytics(
   const thisMonth = countIn((l) => inThisMonth(l, now));
   const allTime = areaLeads.length;
 
-  const matchedJobs = collectMatchedJobsForArea(areaLeads, matches, jobs);
-  const depositsPaid = matchedJobs.filter((j) => j.deposit_receipt_received_at).length;
+  const matchedJobs =
+    useImveRoi && imveMatches
+      ? collectImveMatchedJobsForArea(areaLeads, imveMatches, imveJobs)
+      : collectMatchedJobsForArea(areaLeads, matches, jobs);
+
+  const depositsPaid = matchedJobs.filter(
+    (j) => j.deposit_receipt_received_at
+  ).length;
   const turnover = matchedJobs
     .filter((j) => j.deposit_receipt_received_at)
     .reduce((s, j) => s + (j.final_move_value ?? j.quote_value ?? 0), 0);
@@ -159,8 +197,11 @@ function buildAreaAnalytics(
       : null;
 
   const needsReviewLeads = areaLeads.filter((l) => {
-    const m = matches[l.gmail_message_id];
-    return m?.match_status === "needs_review";
+    const leadId = l.gmail_message_id;
+    if (useImveRoi && imveMatches) {
+      return imveMatches[leadId]?.match_status === "needs_review";
+    }
+    return matches[leadId]?.match_status === "needs_review";
   }).length;
 
   const needsReview =
@@ -197,11 +238,16 @@ export function buildCmmLeadIntelligenceFromLeads(
   jobs: JobRecord[],
   settings: JarvisSettings,
   syncMeta: CmmLeadIntelligence["syncMeta"] | null,
-  matchLedger: CmmMatchLedger | null
+  matchLedger: CmmMatchLedger | null,
+  imveMatchLedger: Awaited<ReturnType<typeof getImveCmmMatchLedger>> | null,
+  imveJobs: ImveJobRecord[],
+  imveRoiActive: boolean
 ): CmmLeadIntelligence {
   const cost = settings.costPerLead;
   const now = new Date();
   const matches = matchLedger?.matches ?? {};
+  const imveMatches = imveMatchLedger?.matches ?? null;
+  const useImveRoi = imveRoiActive && imveJobs.length > 0;
 
   const leadsToday = leads.filter((l) => inToday(l, now)).length;
   const leadsThisWeek = leads.filter((l) => inThisWeek(l, now)).length;
@@ -218,7 +264,16 @@ export function buildCmmLeadIntelligenceFromLeads(
       const areaLeads = leads.filter((l) => l.collection_postcode_area === area);
       return [
         area,
-        buildAreaAnalytics(areaLeads, matches, jobs, cost, now),
+        buildAreaAnalytics(
+          areaLeads,
+          matches,
+          jobs,
+          imveMatches,
+          imveJobs,
+          useImveRoi,
+          cost,
+          now
+        ),
       ];
     })
   ) as Record<PostcodeArea, CmmAreaAnalytics>;
@@ -289,6 +344,22 @@ export function buildCmmLeadIntelligenceFromLeads(
     matchStats: matchLedger?.stats ?? EMPTY_MATCH_STATS,
     reviewQueue: matchLedger?.reviewQueue ?? [],
     unmatchedDepositJobs: matchLedger?.unmatchedDepositJobs ?? [],
+    imveImportSummary:
+      useImveRoi
+        ? {
+            jobCount: imveJobs.length,
+            depositPaidCount: imveJobs.filter((j) => j.deposit_paid).length,
+            matchStats: imveMatchLedger?.stats ?? {
+              autoMatched: 0,
+              needsReview: 0,
+              unmatched: 0,
+              totalLeads: 0,
+              totalImveJobs: imveJobs.length,
+              lastMatchedAt: null,
+            },
+            usingImveForRoi: true,
+          }
+        : null,
     needsSetup,
     setupMessage,
   };
@@ -302,8 +373,12 @@ export async function loadCmmLeadIntelligence(
   const syncMeta = await getCmmSyncMeta();
   const leads = ledger?.leads ?? [];
   const jobs = await getJobsForCmmMatching();
+  const imveLedger = await getImveImportLedgerOrEmpty();
+  const imveJobs = imveLedger.jobs;
+  const imveRoiActive = isImveRoiActive(imveLedger);
 
   let matchLedger = await getCmmMatchLedger();
+  let imveMatchLedger = await getImveCmmMatchLedger();
   const shouldRematch =
     options?.rematch ||
     !matchLedger ||
@@ -314,12 +389,27 @@ export async function loadCmmLeadIntelligence(
     matchLedger = await rematchCmmLeads(leads, jobs);
   }
 
+  if (
+    (options?.rematch || !imveMatchLedger) &&
+    leads.length > 0 &&
+    imveRoiActive &&
+    imveJobs.length > 0
+  ) {
+    const { runImveCmmMatching } = await import("./imve-cmm-match");
+    const { saveImveCmmMatchLedger } = await import("./imve-cmm-match-store");
+    imveMatchLedger = runImveCmmMatching(leads, imveJobs, imveMatchLedger);
+    await saveImveCmmMatchLedger(imveMatchLedger);
+  }
+
   return buildCmmLeadIntelligenceFromLeads(
     leads,
     jobs,
     settings,
     syncMeta,
-    matchLedger
+    matchLedger,
+    imveMatchLedger,
+    imveJobs,
+    imveRoiActive
   );
 }
 
