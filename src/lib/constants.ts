@@ -6,11 +6,11 @@ export const SITE_DESCRIPTION =
 export const PHONE = "020 3026 7324";
 export const PHONE_INTERNATIONAL = "+442030267324";
 export const PHONE_HREF = "tel:+442030267324";
-export const WHATSAPP = "+44 7700 900458";
+export const WHATSAPP = "+44 7522 908555";
 export const WHATSAPP_HREF =
-  "https://wa.me/447700900458?text=Hello%2C%20I%27d%20like%20to%20discuss%20a%20removal.";
+  "https://wa.me/447522908555?text=Hello%2C%20I%27d%20like%20to%20discuss%20a%20removal.";
 export const WHATSAPP_SURVEY_HREF =
-  "https://wa.me/447700900458?text=Hello%2C%20I%27d%20like%20to%20send%20a%20walkthrough%20video%20for%20a%20quotation.";
+  "https://wa.me/447522908555?text=Hello%2C%20I%27d%20like%20to%20send%20a%20walkthrough%20video%20for%20a%20quotation.";
 export const EMAIL = "info@swlremovals.co.uk";
 export const EMAIL_HREF = "mailto:info@swlremovals.co.uk";
 
