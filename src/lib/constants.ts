@@ -3,14 +3,14 @@ export const SITE_URL = "https://www.swlremovals.co.uk";
 export const SITE_DESCRIPTION =
   "Premium removals across Wimbledon & South West London with same day instant online quotes, video or in-person surveys available. Fully insured moving, packing and storage services.";
 
-export const PHONE = "020 3026 7324";
-export const PHONE_INTERNATIONAL = "+442030267324";
-export const PHONE_HREF = "tel:+442030267324";
-export const WHATSAPP = "+44 7522 908555";
+export const PHONE = "07520 636509";
+export const PHONE_INTERNATIONAL = "+447520636509";
+export const PHONE_HREF = "tel:+447520636509";
+export const WHATSAPP = "+44 7520 636509";
 export const WHATSAPP_HREF =
-  "https://wa.me/447522908555?text=Hello%2C%20I%27d%20like%20to%20discuss%20a%20removal.";
+  "https://wa.me/447520636509?text=Hello%2C%20I%27d%20like%20to%20discuss%20a%20removal.";
 export const WHATSAPP_SURVEY_HREF =
-  "https://wa.me/447522908555?text=Hello%2C%20I%27d%20like%20to%20send%20a%20walkthrough%20video%20for%20a%20quotation.";
+  "https://wa.me/447520636509?text=Hello%2C%20I%27d%20like%20to%20send%20a%20walkthrough%20video%20for%20a%20quotation.";
 export const EMAIL = "info@swlremovals.co.uk";
 export const EMAIL_HREF = "mailto:info@swlremovals.co.uk";
 
