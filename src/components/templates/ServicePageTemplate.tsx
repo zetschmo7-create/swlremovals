@@ -111,7 +111,14 @@ export function ServicePageTemplate({
               >
                 100+ locations across South West London and Surrey
               </Link>
-              , including Wimbledon, Richmond, Kingston and Chelsea.
+              , including our{" "}
+              <Link
+                href="/wimbledon-removals"
+                className="font-medium text-green-800 hover:text-green-900 underline-offset-4 hover:underline"
+              >
+                Wimbledon removals service
+              </Link>
+              , Richmond, Kingston and Chelsea.
             </p>
           </FadeIn>
           <FadeIn delay={0.1}>

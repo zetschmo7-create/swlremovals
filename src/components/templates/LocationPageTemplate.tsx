@@ -270,6 +270,7 @@ export function LocationPageTemplate({ location }: Props) {
               </div>
             </FadeIn>
 
+            {location.slug !== "wimbledon-removals" && (
             <FadeIn delay={0.25}>
               <div>
                 <h2 className="font-display text-2xl md:text-3xl font-semibold text-charcoal mb-6">
@@ -301,6 +302,7 @@ export function LocationPageTemplate({ location }: Props) {
                 </div>
               </div>
             </FadeIn>
+            )}
           </div>
 
           <div className="space-y-6">
@@ -327,6 +329,7 @@ export function LocationPageTemplate({ location }: Props) {
                   </Button>
                 </div>
 
+                {location.slug !== "wimbledon-removals" && (
                 <blockquote className="mt-6 pt-6 border-t border-border">
                   <Quote className="w-6 h-6 text-green-800/20 mb-3" />
                   <p className="text-sm text-charcoal-light leading-relaxed italic">
@@ -341,6 +344,7 @@ export function LocationPageTemplate({ location }: Props) {
                     </p>
                   </footer>
                 </blockquote>
+                )}
               </Card>
             </FadeIn>
           </div>
