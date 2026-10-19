@@ -3,6 +3,7 @@ import { DM_Sans, Sora } from "next/font/google";
 import "./globals.css";
 import { SiteShell } from "@/components/layout/SiteShell";
 import { GoogleAnalytics } from "@/components/analytics/GoogleAnalytics";
+import { LeadInteractionTracking } from "@/components/analytics/LeadInteractionTracking";
 import { SeoFlowTracking } from "@/components/analytics/SeoFlowTracking";
 import { LocalBusinessSchema } from "@/components/seo/LocalBusinessSchema";
 import { defaultMetadata } from "@/lib/seo";
@@ -51,6 +52,7 @@ export default function RootLayout({
         data-analytics-ready="true"
       >
         <LocalBusinessSchema />
+        <LeadInteractionTracking />
         <a
           href="#main-content"
           className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-charcoal focus:shadow-[var(--shadow-elevated)]"

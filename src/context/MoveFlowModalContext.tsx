@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { trackLeadInteraction } from "@/lib/lead-tracking";
 import {
   createContext,
   useCallback,
@@ -29,7 +30,10 @@ export const MoveFlowModalContext =
 export function MoveFlowModalProvider({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
 
-  const openQuoteModal = useCallback(() => setIsOpen(true), []);
+  const openQuoteModal = useCallback(() => {
+    trackLeadInteraction("quote_form_open", "moveflow_modal");
+    setIsOpen(true);
+  }, []);
   const closeQuoteModal = useCallback(() => setIsOpen(false), []);
 
   const value = useMemo(
