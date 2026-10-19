@@ -1,8 +1,10 @@
+import Link from "next/link";
 import { createMetadata } from "@/lib/seo";
 import { QuoteForm } from "@/components/quote/QuoteForm";
 import { PageHero } from "@/components/templates/PageHero";
 import { Section } from "@/components/ui/Section";
 import { Card } from "@/components/ui/Card";
+import { FadeIn } from "@/components/ui/FadeIn";
 import { MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { WHATSAPP_SURVEY_HREF } from "@/lib/constants";
@@ -14,6 +16,9 @@ export const metadata = createMetadata({
   path: "/quote",
 });
 
+const linkClass =
+  "font-medium text-green-800 hover:text-green-900 underline-offset-2 hover:underline";
+
 export default function QuotePage() {
   return (
     <>
@@ -23,6 +28,43 @@ export default function QuotePage() {
         description="Complete the form below or send a WhatsApp walkthrough for a faster response."
       />
       <Section className="!pt-0 -mt-8">
+        <FadeIn>
+          <div className="max-w-3xl mb-10">
+            <h2 className="font-display text-2xl font-semibold text-charcoal mb-4">
+              How quotations work
+            </h2>
+            <ol className="space-y-3 text-charcoal-light leading-relaxed mb-4">
+              <li className="flex gap-3">
+                <span className="font-semibold text-green-800">1.</span>
+                Share your details or a WhatsApp video walkthrough.
+              </li>
+              <li className="flex gap-3">
+                <span className="font-semibold text-green-800">2.</span>
+                We review rooms, access and parking.
+              </li>
+              <li className="flex gap-3">
+                <span className="font-semibold text-green-800">3.</span>
+                You receive a fixed quotation.
+              </li>
+            </ol>
+            <p className="text-charcoal-light leading-relaxed">
+              Add{" "}
+              <Link href="/services/house-removals" className={linkClass}>
+                house removals
+              </Link>
+              ,{" "}
+              <Link href="/services/packing" className={linkClass}>
+                packing
+              </Link>{" "}
+              or{" "}
+              <Link href="/services/storage" className={linkClass}>
+                storage
+              </Link>{" "}
+              when you request your quote.
+            </p>
+          </div>
+        </FadeIn>
+
         <div className="grid lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2">
             <Card className="!shadow-[var(--shadow-card)]">
@@ -36,7 +78,7 @@ export default function QuotePage() {
               </h3>
               <p className="text-sm text-charcoal-light mb-4">
                 Record a quick walkthrough of your home and receive a fixed
-                quotation — typically within a few hours.
+                quotation, typically within a few hours.
               </p>
               <Button
                 href={WHATSAPP_SURVEY_HREF}

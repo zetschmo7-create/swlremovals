@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createMetadata } from "@/lib/seo";
 import { PageHero } from "@/components/templates/PageHero";
 import { Section } from "@/components/ui/Section";
@@ -30,10 +31,51 @@ export default function ContactPage() {
       <PageHero
         eyebrow="Contact"
         title="Speak with our team"
-        description="We respond quickly — most enquiries receive a reply within a few hours during business hours."
+        description="We respond quickly. Most enquiries receive a reply within a few hours during business hours."
       />
 
       <Section className="!pt-0 -mt-8">
+        <FadeIn>
+          <div className="max-w-3xl mb-10">
+            <h2 className="font-display text-2xl font-semibold text-charcoal mb-4">
+              How to contact us
+            </h2>
+            <p className="text-charcoal-light leading-relaxed mb-4">
+              {BUSINESS_ADDRESS_LINE}. Call{" "}
+              <a
+                href={PHONE_HREF}
+                className="font-medium text-green-800 hover:text-green-900 underline-offset-2 hover:underline"
+              >
+                {PHONE}
+              </a>
+              , email{" "}
+              <a
+                href={EMAIL_HREF}
+                className="font-medium text-green-800 hover:text-green-900 underline-offset-2 hover:underline"
+              >
+                {EMAIL}
+              </a>
+              , or message us on WhatsApp.
+            </p>
+            <p className="text-charcoal-light leading-relaxed mb-6">
+              We cover Wimbledon, South West London and Surrey. For the fastest
+              quotation, send a short WhatsApp video walkthrough of your rooms.
+              See the{" "}
+              <Link
+                href="/areas-covered"
+                className="font-medium text-green-800 hover:text-green-900 underline-offset-2 hover:underline"
+              >
+                areas we cover
+              </Link>
+              .
+            </p>
+            <Button href={WHATSAPP_HREF} variant="whatsapp" external>
+              <MessageCircle className="w-5 h-5" />
+              WhatsApp us
+            </Button>
+          </div>
+        </FadeIn>
+
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
           {[
             {
@@ -76,7 +118,11 @@ export default function ContactPage() {
                   href={item.href}
                   variant="ghost"
                   size="sm"
-                  external={item.href.startsWith("http") || item.href.startsWith("tel") || item.href.startsWith("mailto")}
+                  external={
+                    item.href.startsWith("http") ||
+                    item.href.startsWith("tel") ||
+                    item.href.startsWith("mailto")
+                  }
                 >
                   {item.cta}
                 </Button>
