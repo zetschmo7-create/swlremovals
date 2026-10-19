@@ -9,7 +9,6 @@ import { JsonLd } from "@/components/seo/JsonLd";
 import { WHATSAPP_SURVEY_HREF } from "@/lib/constants";
 import {
   createBreadcrumbSchema,
-  createFaqSchema,
   createServiceSchema,
 } from "@/lib/schema";
 import { MessageCircle, Check, ArrowRight } from "lucide-react";
@@ -62,11 +61,9 @@ export function ServicePageTemplate({
     path,
   });
 
-  const faqSchema = createFaqSchema(faqs);
-
   return (
     <>
-      <JsonLd data={[breadcrumbSchema, serviceSchema, faqSchema]} />
+      <JsonLd data={[breadcrumbSchema, serviceSchema]} />
 
       <section className="relative bg-green-900 pt-32 pb-20 md:pt-40 md:pb-28">
         <div className="absolute inset-0 bg-gradient-to-br from-green-950 to-green-800" />

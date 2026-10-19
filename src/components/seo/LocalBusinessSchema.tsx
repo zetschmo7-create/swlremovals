@@ -1,66 +1,50 @@
 import { JsonLd } from "./JsonLd";
-import {
-  SITE_NAME,
-  SITE_URL,
-  SITE_DESCRIPTION,
-  PHONE_INTERNATIONAL,
-  EMAIL,
-  TRUST_STATS,
-  AREA_SERVED,
-} from "@/lib/constants";
-import { IMAGES } from "@/lib/images";
-import {
-  ORGANIZATION_ID,
-  WEBSITE_ID,
-  businessPostalAddressSchema,
-} from "@/lib/schema";
+import { SITE_NAME, SITE_URL } from "@/lib/constants";
+import { WEBSITE_ID } from "@/lib/schema";
+
+const BUSINESS_ID = `${SITE_URL}/#business`;
+
+const movingCompanySchema = {
+  "@context": "https://schema.org",
+  "@type": "MovingCompany",
+  "@id": BUSINESS_ID,
+  name: "South West London Removals",
+  url: `${SITE_URL}/`,
+  telephone: "+442080805865",
+  email: "info@swlremovals.co.uk",
+  image: `${SITE_URL}/images/South%20West%20London%20Removals.webp`,
+  address: {
+    "@type": "PostalAddress",
+    streetAddress: "30 Durham Rd",
+    addressLocality: "Raynes Park, London",
+    postalCode: "SW20 0TW",
+    addressCountry: "GB",
+  },
+  areaServed: [
+    "Wimbledon",
+    "South West London",
+    "Surrey",
+    "Richmond",
+    "Kingston upon Thames",
+    "Clapham",
+    "Fulham",
+    "Wandsworth",
+    "Epsom",
+    "Guildford",
+    "Woking",
+  ],
+};
+
+const websiteSchema = {
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "@id": WEBSITE_ID,
+  name: SITE_NAME,
+  url: SITE_URL,
+  publisher: { "@id": BUSINESS_ID },
+  inLanguage: "en-GB",
+};
 
 export function LocalBusinessSchema() {
-  const organizationSchema = {
-    "@context": "https://schema.org",
-    "@type": ["MovingCompany", "LocalBusiness"],
-    "@id": ORGANIZATION_ID,
-    name: SITE_NAME,
-    description: SITE_DESCRIPTION,
-    url: SITE_URL,
-    image: `${SITE_URL}${IMAGES.og}`,
-    logo: `${SITE_URL}${IMAGES.logo}`,
-    telephone: PHONE_INTERNATIONAL,
-    email: EMAIL,
-    address: businessPostalAddressSchema(),
-    areaServed: [...AREA_SERVED],
-    aggregateRating: {
-      "@type": "AggregateRating",
-      ratingValue: TRUST_STATS.googleRating,
-      reviewCount: TRUST_STATS.reviewCount,
-    },
-    priceRange: "£££",
-    openingHoursSpecification: [
-      {
-        "@type": "OpeningHoursSpecification",
-        dayOfWeek: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
-        opens: "08:00",
-        closes: "18:00",
-      },
-      {
-        "@type": "OpeningHoursSpecification",
-        dayOfWeek: "Saturday",
-        opens: "08:00",
-        closes: "16:00",
-      },
-    ],
-  };
-
-  const websiteSchema = {
-    "@context": "https://schema.org",
-    "@type": "WebSite",
-    "@id": WEBSITE_ID,
-    name: SITE_NAME,
-    url: SITE_URL,
-    description: SITE_DESCRIPTION,
-    publisher: { "@id": ORGANIZATION_ID },
-    inLanguage: "en-GB",
-  };
-
-  return <JsonLd data={[organizationSchema, websiteSchema]} />;
+  return <JsonLd data={[movingCompanySchema, websiteSchema]} />;
 }

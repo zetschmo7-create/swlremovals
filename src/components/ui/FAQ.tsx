@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
 
 type FAQItem = {
   question: string;
@@ -41,22 +40,20 @@ export function FAQ({ items, light }: Props) {
                 className={`shrink-0 w-5 h-5 transition-transform duration-300 ${isOpen ? "rotate-180" : ""} ${light ? "text-white/60" : "text-charcoal-muted"}`}
               />
             </button>
-            <AnimatePresence initial={false}>
-              {isOpen && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: "auto", opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.3, ease: "easeInOut" }}
+            {/* Answers stay in the HTML for crawlers; collapsed items are visually hidden only */}
+            <div
+              className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${
+                isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+              }`}
+            >
+              <div className="overflow-hidden">
+                <div
+                  className={`px-5 md:px-6 pb-5 md:pb-6 text-base leading-relaxed ${light ? "text-white/70" : "text-charcoal-light"}`}
                 >
-                  <div
-                    className={`px-5 md:px-6 pb-5 md:pb-6 text-base leading-relaxed ${light ? "text-white/70" : "text-charcoal-light"}`}
-                  >
-                    {item.answer}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+                  {item.answer}
+                </div>
+              </div>
+            </div>
           </div>
         );
       })}

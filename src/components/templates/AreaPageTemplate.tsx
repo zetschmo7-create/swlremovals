@@ -15,7 +15,6 @@ import { MapPin, MessageCircle, ArrowRight } from "lucide-react";
 import { JsonLd } from "@/components/seo/JsonLd";
 import {
   createBreadcrumbSchema,
-  createFaqSchema,
   createServiceSchema,
   organizationReference,
 } from "@/lib/schema";
@@ -37,8 +36,6 @@ export function AreaPageTemplate({ area }: Props) {
     provider: organizationReference(),
   };
 
-  const faqSchema = createFaqSchema(area.faqs);
-
   const breadcrumbSchema = createBreadcrumbSchema([
     { name: "Home", path: "/" },
     { name: "Areas", path: "/areas" },
@@ -47,7 +44,7 @@ export function AreaPageTemplate({ area }: Props) {
 
   return (
     <>
-      <JsonLd data={[serviceSchema, faqSchema, breadcrumbSchema]} />
+      <JsonLd data={[serviceSchema, breadcrumbSchema]} />
 
       <section className="relative bg-green-900 pt-32 pb-20 md:pt-40 md:pb-28">
         <div className="absolute inset-0 bg-gradient-to-br from-green-950 to-green-800" />

@@ -17,7 +17,6 @@ import { JsonLd } from "@/components/seo/JsonLd";
 import { WHATSAPP_SURVEY_HREF } from "@/lib/constants";
 import {
   createBreadcrumbSchema,
-  createFaqSchema,
   createServiceSchema,
   organizationReference,
 } from "@/lib/schema";
@@ -63,8 +62,6 @@ export function LocationPageTemplate({ location }: Props) {
     },
   };
 
-  const faqSchema = createFaqSchema(location.faq);
-
   const breadcrumbSchema = createBreadcrumbSchema([
     { name: "Home", path: "/" },
     { name: "Areas covered", path: AREAS_COVERED_PATH },
@@ -73,7 +70,7 @@ export function LocationPageTemplate({ location }: Props) {
 
   return (
     <>
-      <JsonLd data={[serviceSchema, faqSchema, breadcrumbSchema]} />
+      <JsonLd data={[serviceSchema, breadcrumbSchema]} />
 
       <PageHero
         eyebrow={`${location.locationName} · ${location.postcodes.join(", ")}`}

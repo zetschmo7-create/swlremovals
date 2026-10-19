@@ -15,7 +15,7 @@ export function businessPostalAddressSchema() {
   };
 }
 
-export const ORGANIZATION_ID = `${SITE_URL}/#organization`;
+export const ORGANIZATION_ID = `${SITE_URL}/#business`;
 export const WEBSITE_ID = `${SITE_URL}/#website`;
 
 export function createBreadcrumbSchema(
