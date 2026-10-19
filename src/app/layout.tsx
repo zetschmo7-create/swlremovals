@@ -44,7 +44,6 @@ export default function RootLayout({
       className={`${dmSans.variable} ${sora.variable} h-full antialiased`}
     >
       <head>
-        <GoogleAnalytics />
         <SeoFlowTracking />
       </head>
       <body
@@ -52,6 +51,7 @@ export default function RootLayout({
         data-analytics-ready="true"
       >
         <LocalBusinessSchema />
+        <GoogleAnalytics />
         <LeadInteractionTracking />
         <a
           href="#main-content"
