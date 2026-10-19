@@ -10,7 +10,7 @@ import { ArrowRight } from "lucide-react";
 import { QuoteButton } from "@/components/quote/QuoteButton";
 
 export const metadata = createMetadata({
-  title: "Removals Services",
+  title: "Removals Services South West London | SWL Removals",
   description:
     "Premium house removals, office relocations, packing, and storage across South West London and Surrey.",
   path: "/services",

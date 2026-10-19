@@ -3,9 +3,9 @@ import { ServicePageTemplate } from "@/components/templates/ServicePageTemplate"
 import { IMAGES } from "@/lib/images";
 
 export const metadata = createMetadata({
-  title: "House Removals",
+  title: "House Removals South West London & Surrey | SWL Removals",
   description:
-    "Premium house removals across South West London and Surrey. Fixed quotations, trained crews, and careful handling for every home.",
+    "Careful house removals across South West London and Surrey for flats, terraces and family homes. Fixed quotations and WhatsApp video surveys. Get a quote.",
   path: "/services/house-removals",
   ogImage: IMAGES.movingDay,
   keywords: ["house removals", "home removals Wimbledon", "family home move"],

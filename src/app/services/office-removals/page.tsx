@@ -3,9 +3,9 @@ import { ServicePageTemplate } from "@/components/templates/ServicePageTemplate"
 import { IMAGES } from "@/lib/images";
 
 export const metadata = createMetadata({
-  title: "Office Removals",
+  title: "Office Removals London & Surrey | SWL Removals",
   description:
-    "Discreet, efficient office removals across South West London. Minimal disruption, professional crews, fixed quotations.",
+    "Office removals across London and Surrey with evening and weekend moves available. Planned relocations, minimal disruption. Request a fixed quotation.",
   path: "/services/office-removals",
   ogImage: IMAGES.officeMove,
   keywords: ["office removals", "commercial relocation London"],

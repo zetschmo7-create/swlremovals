@@ -3,9 +3,9 @@ import { ServicePageTemplate } from "@/components/templates/ServicePageTemplate"
 import { IMAGES } from "@/lib/images";
 
 export const metadata = createMetadata({
-  title: "Storage",
+  title: "Removals and Storage South West London | SWL Removals",
   description:
-    "Secure storage solutions for South West London removals. Short and long-term storage for chain moves and downsizing.",
+    "Short and long-term storage alongside your removal across South West London and Surrey. Ideal for chain delays, renovations and downsizing. Get a quote.",
   path: "/services/storage",
   ogImage: IMAGES.storage,
   keywords: ["storage removals", "furniture storage London"],

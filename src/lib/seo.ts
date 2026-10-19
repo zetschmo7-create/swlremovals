@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { SITE_NAME, SITE_URL, SITE_DESCRIPTION } from "./constants";
+import { SITE_NAME, SITE_URL } from "./constants";
 import { IMAGES } from "./images";
 
 type PageSEO = {
@@ -16,6 +16,14 @@ export function absoluteUrl(path: string) {
   return `${SITE_URL}${path}`;
 }
 
+/** Use title as-is when it already includes a pipe (full document title). */
+export function resolveDocumentTitle(title: string): string {
+  if (title === SITE_NAME || title.includes("|")) {
+    return title;
+  }
+  return `${title} | ${SITE_NAME}`;
+}
+
 export function createMetadata({
   title,
   description,
@@ -25,11 +33,10 @@ export function createMetadata({
   ogImageAlt,
   noIndex = false,
 }: PageSEO): Metadata {
-  const fullTitle =
-    title === SITE_NAME ? title : `${title} | ${SITE_NAME}`;
+  const fullTitle = resolveDocumentTitle(title);
   const url = absoluteUrl(path);
   const imageUrl = ogImage.startsWith("http") ? ogImage : absoluteUrl(ogImage);
-  const imageAlt = ogImageAlt ?? `${title} — ${SITE_NAME}`;
+  const imageAlt = ogImageAlt ?? `${title} | ${SITE_NAME}`;
 
   return {
     title: fullTitle,
@@ -85,12 +92,18 @@ export function createMetadata({
   };
 }
 
+export const HOME_TITLE =
+  "Removals in South West London & Surrey | SWL Removals";
+export const HOME_DESCRIPTION =
+  "House and office removals across Wimbledon, South West London and Surrey. Fixed quotations, WhatsApp video surveys, packing and storage. Get a quote.";
+
 export const defaultMetadata = createMetadata({
-  title: SITE_NAME,
-  description: SITE_DESCRIPTION,
+  title: HOME_TITLE,
+  description: HOME_DESCRIPTION,
   path: "/",
   ogImage: IMAGES.og,
-  ogImageAlt: "South West London Removals — premium home moves across Wimbledon and Surrey",
+  ogImageAlt:
+    "South West London Removals | premium home moves across Wimbledon and Surrey",
   keywords: [
     "Wimbledon removals",
     "South West London removals",

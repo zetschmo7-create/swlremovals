@@ -5,6 +5,7 @@ import {
   getLocationSlugs,
   locationPath,
 } from "@/data/locationPages";
+import { buildLocationSeoTitle } from "@/lib/locationSeoTitles";
 import { LocationPageTemplate } from "@/components/templates/LocationPageTemplate";
 
 type Props = {
@@ -21,7 +22,11 @@ export async function generateMetadata({ params }: Props) {
   if (!location) return {};
 
   return createMetadata({
-    title: location.metaTitle,
+    title: buildLocationSeoTitle(
+      location.slug,
+      location.locationName,
+      location.postcodes
+    ),
     description: location.metaDescription,
     path: locationPath(location.slug),
     keywords: [

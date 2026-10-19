@@ -7,7 +7,7 @@ import { TRUST_STATS } from "@/lib/constants";
 import { QuoteButton } from "@/components/quote/QuoteButton";
 
 export const metadata = createMetadata({
-  title: "About Us",
+  title: "About SWL Removals | Removals in South West London",
   description:
     "South West London Removals — premium home and office removals with fixed quotations, trained crews, and deep local expertise since 2009.",
   path: "/about",

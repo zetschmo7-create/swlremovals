@@ -18,7 +18,7 @@ import {
 import { Phone, Mail, MessageCircle, MapPin } from "lucide-react";
 
 export const metadata = createMetadata({
-  title: "Contact",
+  title: "Contact SWL Removals | Call, Email or WhatsApp",
   description:
     "Contact South West London Removals. Call, email, or WhatsApp for fixed quotations and move enquiries.",
   path: "/contact",

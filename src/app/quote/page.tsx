@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { WHATSAPP_SURVEY_HREF } from "@/lib/constants";
 
 export const metadata = createMetadata({
-  title: "Get a Quote",
+  title: "Get a Removals Quote | Fixed Quotations | SWL Removals",
   description:
     "Request a fixed quotation for your South West London or Surrey move. Multi-step form or WhatsApp walkthrough video.",
   path: "/quote",

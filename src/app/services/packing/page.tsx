@@ -3,9 +3,9 @@ import { ServicePageTemplate } from "@/components/templates/ServicePageTemplate"
 import { IMAGES } from "@/lib/images";
 
 export const metadata = createMetadata({
-  title: "Packing Services",
+  title: "Packing Services South West London | SWL Removals",
   description:
-    "Professional packing services for South West London moves. Premium materials, careful labelling, full or partial packing.",
+    "Full and partial packing for moves across South West London and Surrey. Careful labelling and quality materials. Request a fixed quotation.",
   path: "/services/packing",
   ogImage: IMAGES.packing,
   keywords: ["packing service", "professional packers London"],
