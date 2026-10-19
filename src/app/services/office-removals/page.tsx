@@ -1,5 +1,6 @@
 import { createMetadata } from "@/lib/seo";
 import { ServicePageTemplate } from "@/components/templates/ServicePageTemplate";
+import { OfficeRemovalsSeoContent } from "@/components/services/OfficeRemovalsSeoContent";
 import { IMAGES } from "@/lib/images";
 
 export const metadata = createMetadata({
@@ -45,6 +46,7 @@ export default function OfficeRemovalsPage() {
             "We recommend four to six weeks for larger commercial moves, though shorter timelines can often be accommodated.",
         },
       ]}
+      extraContent={<OfficeRemovalsSeoContent />}
     />
   );
 }

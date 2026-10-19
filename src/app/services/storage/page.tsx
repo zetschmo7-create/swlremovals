@@ -1,5 +1,6 @@
 import { createMetadata } from "@/lib/seo";
 import { ServicePageTemplate } from "@/components/templates/ServicePageTemplate";
+import { StorageSeoContent } from "@/components/services/StorageSeoContent";
 import { IMAGES } from "@/lib/images";
 
 export const metadata = createMetadata({
@@ -45,6 +46,7 @@ export default function StoragePage() {
             "Yes. Collection from your property and delivery when you are ready is all part of the service.",
         },
       ]}
+      extraContent={<StorageSeoContent />}
     />
   );
 }

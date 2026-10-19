@@ -1,5 +1,6 @@
 import { createMetadata } from "@/lib/seo";
 import { ServicePageTemplate } from "@/components/templates/ServicePageTemplate";
+import { PackingSeoContent } from "@/components/services/PackingSeoContent";
 import { IMAGES } from "@/lib/images";
 
 export const metadata = createMetadata({
@@ -45,6 +46,7 @@ export default function PackingPage() {
             "A full three-bedroom home typically takes one day. We assess timing during your quotation.",
         },
       ]}
+      extraContent={<PackingSeoContent />}
     />
   );
 }

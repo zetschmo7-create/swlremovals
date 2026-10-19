@@ -1,5 +1,6 @@
 import { createMetadata } from "@/lib/seo";
 import { ServicePageTemplate } from "@/components/templates/ServicePageTemplate";
+import { HouseRemovalsSeoContent } from "@/components/services/HouseRemovalsSeoContent";
 import { IMAGES } from "@/lib/images";
 
 export const metadata = createMetadata({
@@ -45,6 +46,7 @@ export default function HouseRemovalsPage() {
             "Yes. We offer flexible scheduling and storage solutions to accommodate property chains.",
         },
       ]}
+      extraContent={<HouseRemovalsSeoContent />}
     />
   );
 }

@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { Section, SectionHeader } from "@/components/ui/Section";
 import { FAQ } from "@/components/ui/FAQ";
@@ -39,6 +40,7 @@ type Props = {
   intro: string;
   features: string[];
   faqs: { question: string; answer: string }[];
+  extraContent?: ReactNode;
 };
 
 export function ServicePageTemplate({
@@ -48,6 +50,7 @@ export function ServicePageTemplate({
   intro,
   features,
   faqs,
+  extraContent,
 }: Props) {
   const breadcrumbSchema = createBreadcrumbSchema([
     { name: "Home", path: "/" },
@@ -126,6 +129,12 @@ export function ServicePageTemplate({
           </FadeIn>
         </div>
       </Section>
+
+      {extraContent ? (
+        <Section className="!pt-0">
+          <FadeIn>{extraContent}</FadeIn>
+        </Section>
+      ) : null}
 
       <Section className="gradient-premium">
         <SectionHeader
