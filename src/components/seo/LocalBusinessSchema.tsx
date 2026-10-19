@@ -5,7 +5,6 @@ import {
   SITE_DESCRIPTION,
   PHONE_INTERNATIONAL,
   EMAIL,
-  TRUST_STATS,
   AREA_SERVED,
 } from "@/lib/constants";
 import { IMAGES } from "@/lib/images";
@@ -29,24 +28,13 @@ export function LocalBusinessSchema() {
     email: EMAIL,
     address: businessPostalAddressSchema(),
     areaServed: [...AREA_SERVED],
-    aggregateRating: {
-      "@type": "AggregateRating",
-      ratingValue: TRUST_STATS.googleRating,
-      reviewCount: TRUST_STATS.reviewCount,
-    },
     priceRange: "£££",
     openingHoursSpecification: [
       {
         "@type": "OpeningHoursSpecification",
-        dayOfWeek: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
-        opens: "08:00",
-        closes: "18:00",
-      },
-      {
-        "@type": "OpeningHoursSpecification",
-        dayOfWeek: "Saturday",
-        opens: "08:00",
-        closes: "16:00",
+        dayOfWeek: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+        opens: "00:00",
+        closes: "23:59",
       },
     ],
   };

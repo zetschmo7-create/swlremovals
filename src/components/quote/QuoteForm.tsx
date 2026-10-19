@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { WHATSAPP_HREF } from "@/lib/constants";
+import { trackLeadInteraction } from "@/lib/lead-tracking";
 import {
   ArrowLeft,
   ArrowRight,
@@ -91,28 +92,44 @@ export function QuoteForm() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    trackLeadInteraction("quote_form_ready", "standalone_quote_form");
     setSubmitted(true);
   };
 
   if (submitted) {
+    const message = [
+      "Hello South West London Removals, please quote for this move:",
+      `Name: ${data.name}`,
+      `Phone: ${data.phone}`,
+      `Email: ${data.email}`,
+      `From: ${data.movingFrom}`,
+      `To: ${data.movingTo}`,
+      `Property: ${data.propertyType}; bedrooms: ${data.bedrooms}`,
+      `Preferred date: ${data.moveDate}`,
+      `Packing: ${data.packingRequired}; storage: ${data.storageRequired}`,
+      `Preferred contact: ${data.preferredContact}`,
+      data.videoFile ? "I will attach my walkthrough video separately in WhatsApp." : "",
+    ].filter(Boolean).join("\n");
+    const whatsappUrl = new URL(WHATSAPP_HREF);
+    whatsappUrl.searchParams.set("text", message);
     return (
       <div className="text-center py-12">
         <div className="w-16 h-16 rounded-full bg-green-800/10 flex items-center justify-center mx-auto mb-6">
           <Check className="w-8 h-8 text-green-800" />
         </div>
         <h2 className="font-display text-2xl md:text-3xl font-semibold text-charcoal mb-4">
-          Quote request received
+          Your request is ready to send
         </h2>
         <p className="text-charcoal-light max-w-md mx-auto mb-8">
-          Thank you, {data.name}. We will review your details and respond with a
-          fixed quotation — typically within a few hours during business hours.
+          {data.name}, use the button below to open WhatsApp with your move details,
+          then press Send there. Your request has not been sent yet.
         </p>
-        {data.whatsappPreferred && (
-          <Button href={WHATSAPP_HREF} variant="whatsapp" external>
+        {data.videoFile && <p className="text-sm text-charcoal-light mb-6">Attach your video in WhatsApp. The website has not uploaded it.</p>}
+          <Button href={whatsappUrl.toString()} variant="whatsapp" external>
             <MessageCircle className="w-5 h-5" />
-            Continue on WhatsApp
+            Send request through WhatsApp
           </Button>
-        )}
+        <button type="button" className="block mx-auto mt-6 text-sm underline" onClick={() => setSubmitted(false)}>Edit my details</button>
       </div>
     );
   }
@@ -348,14 +365,14 @@ export function QuoteForm() {
             </div>
             <div>
               <label className="block text-sm font-medium text-charcoal mb-2">
-                Upload walkthrough video (optional)
+                Select a walkthrough video to attach later (optional)
               </label>
               <label className="flex flex-col items-center justify-center w-full px-4 py-8 rounded-xl border-2 border-dashed border-border bg-cream hover:border-green-700/30 transition-colors cursor-pointer">
                 <Upload className="w-8 h-8 text-charcoal-muted mb-2" />
                 <span className="text-sm text-charcoal-light">
                   {data.videoFile
                     ? data.videoFile.name
-                    : "Drop a video file or click to browse"}
+                    : "Choose a video; attach it yourself in WhatsApp"}
                 </span>
                 <input
                   type="file"
@@ -396,7 +413,7 @@ export function QuoteForm() {
           </Button>
         ) : (
           <Button type="submit" disabled={!canProceed()}>
-            Submit Quote Request
+            Prepare WhatsApp request
           </Button>
         )}
       </div>
