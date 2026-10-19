@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMoveFlowModal } from "@/hooks/useMoveFlowModal";
+import { useQuoteModal } from "@/hooks/useQuoteModal";
 import { type ReactNode } from "react";
 
 type Props = {
@@ -11,7 +11,7 @@ type Props = {
 };
 
 export function QuoteAwareLink({ href, children, className }: Props) {
-  const { openQuoteModal } = useMoveFlowModal();
+  const { openQuoteModal } = useQuoteModal();
 
   if (href === "/quote") {
     return (

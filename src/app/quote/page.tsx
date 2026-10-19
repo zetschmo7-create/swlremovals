@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createMetadata } from "@/lib/seo";
-import { QuoteForm } from "@/components/quote/QuoteForm";
+import { EnquiryQuoteForm } from "@/components/quote/EnquiryQuoteForm";
 import { PageHero } from "@/components/templates/PageHero";
 import { Section } from "@/components/ui/Section";
 import { Card } from "@/components/ui/Card";
@@ -67,8 +67,16 @@ export default function QuotePage() {
 
         <div className="grid lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2">
-            <Card className="!shadow-[var(--shadow-card)]">
-              <QuoteForm />
+            <Card className="!shadow-[var(--shadow-card)] !bg-cream/60">
+              <div className="mb-6">
+                <h2 className="font-display text-2xl font-semibold text-charcoal tracking-tight">
+                  Start your moving quotation
+                </h2>
+                <p className="mt-2 text-charcoal-light leading-relaxed">
+                  Send your move details and request a tailored quotation.
+                </p>
+              </div>
+              <EnquiryQuoteForm variant="page" />
             </Card>
           </div>
           <div className="space-y-6">

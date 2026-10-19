@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/Button";
-import { useMoveFlowModal } from "@/hooks/useMoveFlowModal";
+import { useQuoteModal } from "@/hooks/useQuoteModal";
 import { type ReactNode } from "react";
 
 type ButtonVariant = "primary" | "secondary" | "outline" | "whatsapp" | "ghost";
@@ -24,7 +24,7 @@ export function QuoteButton({
   type = "button",
   disabled,
 }: Props) {
-  const { openQuoteModal } = useMoveFlowModal();
+  const { openQuoteModal } = useQuoteModal();
 
   return (
     <Button

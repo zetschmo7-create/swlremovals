@@ -1,6 +1,6 @@
 "use client";
 
-import { useMoveFlowModal } from "@/hooks/useMoveFlowModal";
+import { useQuoteModal } from "@/hooks/useQuoteModal";
 import { type MouseEvent, type ReactNode } from "react";
 
 type Props = {
@@ -16,7 +16,7 @@ export function QuoteTrigger({
   onClick,
   "aria-label": ariaLabel,
 }: Props) {
-  const { openQuoteModal } = useMoveFlowModal();
+  const { openQuoteModal } = useQuoteModal();
 
   return (
     <button

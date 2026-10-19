@@ -6,7 +6,7 @@ import { Footer } from "@/components/layout/Footer";
 import { MobileCTABar } from "@/components/layout/MobileCTABar";
 import { WhatsAppFloat } from "@/components/layout/WhatsAppFloat";
 import { StickyQuoteCTA } from "@/components/layout/StickyQuoteCTA";
-import { MoveFlowModalProvider } from "@/context/MoveFlowModalContext";
+import { QuoteModalProvider } from "@/context/QuoteModalContext";
 
 export function SiteShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -17,7 +17,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <MoveFlowModalProvider>
+    <QuoteModalProvider>
       <Header />
       <main id="main-content" className="flex-1">
         {children}
@@ -26,6 +26,6 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
       <StickyQuoteCTA />
       <MobileCTABar />
       <WhatsAppFloat />
-    </MoveFlowModalProvider>
+    </QuoteModalProvider>
   );
 }

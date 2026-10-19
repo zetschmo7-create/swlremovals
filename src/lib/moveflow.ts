@@ -1,9 +1,4 @@
-export const MOVEFLOW_INTAKE_URL =
-  "https://moveflow.cloud/intake/sw-london-removals";
-
-export const MOVEFLOW_EMBED_URL =
-  "https://moveflow.cloud/embed/sw-london-removals?theme=light&corner=rounded";
-
+/** Reviews / badges only — quotation intake uses the native enquiry form. */
 export const MOVEFLOW_REVIEWS_URL =
   "https://moveflow.cloud/reviews/sw-london-removals";
 
