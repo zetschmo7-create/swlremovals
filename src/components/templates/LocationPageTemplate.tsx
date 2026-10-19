@@ -14,6 +14,7 @@ import { FadeIn } from "@/components/ui/FadeIn";
 import { CTABanner } from "@/components/home/CTABanner";
 import { PageHero } from "@/components/templates/PageHero";
 import { JsonLd } from "@/components/seo/JsonLd";
+import { WimbledonSeoContent } from "@/components/locations/WimbledonSeoContent";
 import { WHATSAPP_SURVEY_HREF } from "@/lib/constants";
 import {
   createBreadcrumbSchema,
@@ -146,6 +147,10 @@ export function LocationPageTemplate({ location }: Props) {
                 </div>
               </div>
             </FadeIn>
+
+            {location.slug === "wimbledon-removals" ? (
+              <WimbledonSeoContent />
+            ) : null}
 
             <FadeIn delay={0.05}>
               <div>
