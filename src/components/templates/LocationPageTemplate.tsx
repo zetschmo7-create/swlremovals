@@ -355,7 +355,7 @@ export function LocationPageTemplate({ location }: Props) {
           title={`Nearby areas we cover from ${location.locationName}`}
           description="We work across South West London and Surrey. Explore removals in neighbouring areas."
         />
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {location.nearbyAreas.map((area) => (
             <FadeIn key={`${location.slug}-${area.slug}`}>
               <Link
@@ -370,6 +370,16 @@ export function LocationPageTemplate({ location }: Props) {
             </FadeIn>
           ))}
         </div>
+        <p className="mt-8 text-center text-sm text-charcoal-light">
+          Looking for a full house move? See our{" "}
+          <Link
+            href="/services/house-removals"
+            className="font-medium text-green-800 hover:text-green-900 underline-offset-2 hover:underline"
+          >
+            house removals
+          </Link>{" "}
+          service.
+        </p>
       </Section>
 
       <Section>

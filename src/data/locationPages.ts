@@ -320,6 +320,7 @@ export const LOCATION_PAGES: LocationPageData[] = [
       { name: "Wandsworth", slug: "wandsworth-removals" },
       { name: "Fulham", slug: "fulham-removals" },
       { name: "Barnes", slug: "barnes-removals" },
+      { name: "Wimbledon", slug: "wimbledon-removals" },
       { name: "Balham", slug: "balham-removals" },
     ],
     popularMoveRoutes: [
@@ -426,6 +427,8 @@ export const LOCATION_PAGES: LocationPageData[] = [
       { name: "Putney", slug: "putney-removals" },
       { name: "Balham", slug: "balham-removals" },
       { name: "Tooting", slug: "tooting-removals" },
+      { name: "Wimbledon", slug: "wimbledon-removals" },
+      { name: "Southfields", slug: "southfields-removals" },
       { name: "Fulham", slug: "fulham-removals" },
     ],
     popularMoveRoutes: [
