@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
     "test": "npx tsx --test src/lib/jarvis/commercial-intelligence.test.ts src/lib/jarvis/ask-jarvis-commercial.test.ts src/lib/enquiry.test.ts"
