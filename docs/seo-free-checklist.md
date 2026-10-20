@@ -35,3 +35,32 @@ Authorised 19 October 2026: execute the free actions from the user's 11-page SEO
 7. Distribb has no supported external-live-URL setter in its documented article update fields. Do not invent a Published state or claim its CMS integration is connected. The repository record and verified URL prove website publication. Report the separate Distribb status accurately and escalate supported reconciliation if needed.
 
 No new paid CMS, database, webhook service or scheduled hosting process is needed for this publishing route. The existing ChatGPT tasks perform checked repository updates. Existing provider subscriptions and hosting limits remain the user's responsibility; do not buy additional capacity.
+
+
+## Quality check: 20 October 2026
+
+### Production regression, release held
+- Verified Vercel project `prj_GgDXTSozQgNk9NCyDblol6jsLS6b`, team `team_K5HbnGZmUZ0Sj19z48lGXJyP`.
+- Current production deployment `dpl_3kHP24nQ4oGe5KPNXGNjDAuSYJGf` is READY, source CLI, labelled commit `cb4f2520c4c6833eacd3a77b7068b5aed2227025` ("Replace MoveFlow quote intake with SMTP enquiry form.").
+- GitHub main still points to `6144a928f0a0c8e9d3a3b831af51a6e465fff173`. Fetching the deployed commit from this repository failed twice with "No commit found for SHA". The CLI-deployed source is not available through this repository connection.
+- `/blog` and `/blog/removal-companies-in-south-west-london-and-surrey-compared` now return 404. Rechecked by HTTP and by browser reload. The live sitemap no longer contains that article.
+- The saved repository article 122926 still exactly matches Distribb's current HTML. No content was lost from the registry.
+- Do not redeploy old main or merge this evidence branch while production source is unresolved: doing so could overwrite the newly deployed native SMTP form. Required next action: push Cursor's deployed source commit/branch to this repository, reconcile it with current main, restore the existing blog route/registry/sitemap without changing URLs, test, then release the merged source.
+
+### Completed foundation check
+- Public robots.txt returns 200, allows public crawling and disallows /admin/. Sitemap reference is correct.
+- Sitemap returns 200 and includes /wimbledon-removals.
+- Wimbledon and all four service pages return 200, have self-referencing canonical URLs and index/follow metadata. All four service pages contain a link to Wimbledon; house removals has two links.
+- /quote returns 200 and visually displays the new single-screen native enquiry form. No enquiry was submitted or email sent during this run. SMTP delivery has not been verified.
+- Current site-wide WhatsApp links point to 447520636509, whereas the user-approved business number in this conversation is 447522908555. Flag this routing mismatch for correction in the reconciled source; do not assume the old number is authorised.
+- Contact tracking and consent changes from main cannot be certified in the different CLI production build. Mobile rendering of the missing article cannot be certified.
+
+### Article review
+- Listed all nine articles with pagination complete, then fetched all nine full records to inspect actual modification/publication fields. Distribb reports no PublishedAt timestamps; do not treat scheduled dates as publication evidence.
+- Article 122926 (website publication recorded 19 October): 2,700 words, title 47 characters, meta description 157 characters, ten H2 IDs, eight images with alt text. Existing local validator passes; saved body has no em dashes/banned phrases/document shell, duplicate IDs or unresolved TOC anchors. Includes Merton and GOV.UK sources. Live rendering fails because the URL is now 404.
+- Article 122928 (22 October 09:00 Europe/London): already claimed, approximately 2,583 words, title 52 characters, meta description 152 characters, thirteen H2 IDs, two images with alt text, Merton/ICO/HSE sources, Wimbledon links, no detected banned phrases or unresolved TOC links. Held for its existing date, not published early. Full brief-dependent sign-off is blocked.
+- Article 122927 (20 October 09:00 Europe/London): only a 58-character planning placeholder, unclaimed and not currently marked as writing. Leave to Distribb inside its 72-hour window; it is not a finished article.
+- get_article_brief failed with MCP -32603 Internal error for project 2021 articles 122926, 122928 and 122927; each request retried once and failed again. Required exchange/internal-link commitments and exact current targets cannot be reverified. Report these IDs to Distribb support if the failure persists. No edits or credit-consuming generation were attempted.
+- No connected Distribb CMS integrations. Repository publishing remains separate and must not be represented as connected CMS or a Distribb Published state.
+
+This evidence is intentionally saved on a separate branch. No production deployment or live edit was performed by this check.
