@@ -123,27 +123,37 @@ export function EnquiryQuoteModal({ isOpen, onClose }: Props) {
           <X className="h-5 w-5" strokeWidth={1.5} />
         </button>
 
-        <div className="shrink-0 border-b border-border/60 px-5 pt-6 pb-4 md:px-8 md:pt-8 md:pb-5 pr-16">
-          <Image
-            src={IMAGES.navLogo}
-            alt={SITE_NAME}
-            width={LOGO_DISPLAY.width}
-            height={LOGO_DISPLAY.height}
-            className="mb-4 h-auto w-[150px] object-contain object-left"
-            priority
-          />
-          <h2
-            id="enquiry-quote-title"
-            className="font-display text-2xl md:text-3xl font-semibold text-charcoal tracking-tight"
-          >
-            Start your moving quotation
-          </h2>
-          <p
-            id="enquiry-quote-description"
-            className="mt-2 text-sm md:text-base text-charcoal-light leading-relaxed max-w-2xl"
-          >
-            Send your move details and request a tailored quotation.
-          </p>
+        {/*
+          Logo asset is square with large transparent vertical padding.
+          Crop to the opaque brand band (~1533×353 in a 1563 canvas) so
+          doubling CSS width doubles the visible mark without a tall empty header.
+        */}
+        <div className="shrink-0 border-b border-border/60 px-5 pt-5 pb-3.5 md:px-8 md:pt-6 md:pb-4">
+          <div className="mx-auto flex max-w-2xl flex-col items-center px-10 text-center sm:px-12">
+            <div className="relative w-[min(100%,220px)] sm:w-[260px] md:w-[300px] aspect-[1533/353] overflow-hidden">
+              <Image
+                src={IMAGES.navLogo}
+                alt={SITE_NAME}
+                width={LOGO_DISPLAY.width}
+                height={LOGO_DISPLAY.height}
+                className="pointer-events-none absolute left-1/2 top-1/2 h-[443%] w-[102%] max-w-none -translate-x-1/2 -translate-y-1/2 object-contain"
+                sizes="(max-width: 640px) 220px, (max-width: 768px) 260px, 300px"
+                priority
+              />
+            </div>
+            <h2
+              id="enquiry-quote-title"
+              className="mt-2 font-display text-2xl md:mt-2.5 md:text-3xl font-semibold text-charcoal tracking-tight text-center"
+            >
+              Start your moving quotation
+            </h2>
+            <p
+              id="enquiry-quote-description"
+              className="mt-1.5 text-sm md:text-base text-charcoal-light leading-relaxed text-center max-w-xl"
+            >
+              Send your move details and request a tailored quotation.
+            </p>
+          </div>
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto bg-white/80 px-5 py-5 md:px-8 md:py-6">
