@@ -93,11 +93,14 @@ export function EnquiryQuoteForm({ variant = "modal", onSuccess }: Props) {
     setErrors({});
 
     try {
+      const { companyWebsite, ...leadFields } = values;
       const response = await fetch("/api/enquiry", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...values,
+          ...leadFields,
+          // Anti-autofill honeypot name — never use company/website semantics
+          swl_hp_token: companyWebsite,
           pageUrl:
             typeof window !== "undefined" ? window.location.href : "",
         }),
@@ -105,16 +108,35 @@ export function EnquiryQuoteForm({ variant = "modal", onSuccess }: Props) {
 
       const payload = (await response.json().catch(() => ({}))) as {
         ok?: boolean;
+        accepted?: boolean;
+        honeypot?: boolean;
+        submissionRef?: string;
         error?: string;
         errors?: Record<string, string>;
         configMissing?: boolean;
+        recipients?: Array<{ recipient: string; accepted: boolean }>;
       };
 
-      if (!response.ok || !payload.ok) {
+      const businessAccepted =
+        payload.accepted === true &&
+        payload.ok === true &&
+        typeof payload.submissionRef === "string" &&
+        payload.submissionRef.length > 0 &&
+        payload.honeypot !== true &&
+        Array.isArray(payload.recipients) &&
+        payload.recipients.length > 0 &&
+        payload.recipients.every((entry) => entry.accepted === true);
+
+      // Never treat HTTP 200 alone as success (honeypot / soft failures).
+      if (!businessAccepted) {
         if (payload.errors) setErrors(payload.errors);
+        const refHint =
+          typeof payload.submissionRef === "string" && payload.submissionRef
+            ? ` (ref ${payload.submissionRef})`
+            : "";
         setSubmitError(
-          payload.error ||
-            "We could not send your enquiry. Please try again."
+          (payload.error ||
+            "We could not send your enquiry. Please try again.") + refHint
         );
         return;
       }
@@ -167,14 +189,28 @@ export function EnquiryQuoteForm({ variant = "modal", onSuccess }: Props) {
         </p>
       </div>
 
-      {/* Honeypot */}
-      <div className="absolute -left-[9999px] h-0 w-0 overflow-hidden" aria-hidden>
-        <label htmlFor="companyWebsite">Company website</label>
+      {/*
+        Honeypot: obscure name + password managers ignored.
+        Autofill of a field named "companyWebsite" previously returned a soft
+        success with no email — real users saw thank-you with no notification.
+      */}
+      <div
+        className="absolute -left-[9999px] h-0 w-0 overflow-hidden opacity-0"
+        aria-hidden
+      >
+        <label htmlFor="swl_hp_token">Leave blank</label>
         <input
-          id="companyWebsite"
-          name="companyWebsite"
+          id="swl_hp_token"
+          name="swl_hp_token"
+          type="text"
           tabIndex={-1}
-          autoComplete="off"
+          autoComplete="new-password"
+          autoCapitalize="off"
+          autoCorrect="off"
+          spellCheck={false}
+          data-lpignore="true"
+          data-1p-ignore="true"
+          data-form-type="other"
           value={values.companyWebsite}
           onChange={(e) => update({ companyWebsite: e.target.value })}
         />

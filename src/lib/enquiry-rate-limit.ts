@@ -32,14 +32,26 @@ export function checkEnquiryRateLimit(key: string): {
 const recentFingerprints = new Map<string, number>();
 const DEDUPE_MS = 60 * 1000;
 
-/** Blocks identical submissions within a short window. */
-export function isDuplicateEnquiry(fingerprint: string): boolean {
-  const now = Date.now();
+function pruneFingerprints(now: number) {
   for (const [key, at] of recentFingerprints) {
     if (now - at > DEDUPE_MS) recentFingerprints.delete(key);
   }
+}
+
+/**
+ * Returns true if an identical successful submission was recorded recently.
+ * Does not mutate state — call markEnquirySubmitted only after business email succeeds.
+ */
+export function isDuplicateEnquiry(fingerprint: string): boolean {
+  const now = Date.now();
+  pruneFingerprints(now);
   const previous = recentFingerprints.get(fingerprint);
-  if (previous && now - previous < DEDUPE_MS) return true;
+  return Boolean(previous && now - previous < DEDUPE_MS);
+}
+
+/** Record a successful enquiry so identical retries within the window are blocked. */
+export function markEnquirySubmitted(fingerprint: string): void {
+  const now = Date.now();
+  pruneFingerprints(now);
   recentFingerprints.set(fingerprint, now);
-  return false;
 }

@@ -45,12 +45,16 @@ export const ENQUIRY_RECIPIENTS = [
   "info@swlremovals.co.uk",
 ] as const;
 
-/** Optional in-person survey WhatsApp (thank-you screen only). */
+/** Optional in-person survey WhatsApp (thank-you screen + customer acknowledgement). */
+export const ENQUIRY_SURVEY_WHATSAPP_NUMBER = "447522908555";
+
 export const ENQUIRY_SURVEY_WHATSAPP_HREF =
-  "https://wa.me/447522908555?text=" +
+  `https://wa.me/${ENQUIRY_SURVEY_WHATSAPP_NUMBER}?text=` +
   encodeURIComponent(
     "Hi SW London Removals, I've submitted a moving enquiry through your website and would like to arrange a free, no-obligation in-person survey."
   );
+
+export const ENQUIRY_SURVEY_WHATSAPP_URL = `https://wa.me/${ENQUIRY_SURVEY_WHATSAPP_NUMBER}`;
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const POSTCODE_RE = /^[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}$/i;
@@ -68,8 +72,11 @@ export function validateEnquiryPayload(
 ): EnquiryValidationResult {
   const errors: Record<string, string> = {};
 
-  // Honeypot filled → treat as bot (silent reject at API layer)
-  const companyWebsite = clean(raw.companyWebsite);
+  // Honeypot — accept legacy + anti-autofill field names; any value = bot
+  const companyWebsite =
+    clean(raw.companyWebsite) ||
+    clean(raw.swl_hp_token) ||
+    clean(raw.websiteUrlConfirm);
 
   const fullName = clean(raw.fullName);
   const phone = clean(raw.phone);
@@ -171,13 +178,20 @@ function displayOrNotProvided(value: string): string {
   return value.trim() ? value.trim() : "Not provided";
 }
 
+export function firstNameFromFullName(fullName: string): string {
+  const first = fullName.trim().split(/\s+/)[0] ?? "";
+  return first || "there";
+}
+
 export function buildEnquiryEmailContent(
   data: EnquiryPayload,
-  submittedAtIso: string
+  submittedAtIso: string,
+  submissionRef: string
 ): { subject: string; text: string; html: string } {
   const subject = `New SWL moving enquiry – ${data.fullName}`;
 
   const rows: [string, string][] = [
+    ["Submission reference", submissionRef],
     ["Full name", data.fullName],
     ["Phone", displayOrNotProvided(data.phone)],
     ["Email", data.email],
@@ -205,6 +219,46 @@ export function buildEnquiryEmailContent(
   const html = `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;color:#1a1a1a;">
 <p>A new moving enquiry was submitted on the SW London Removals website.</p>
 <table style="border-collapse:collapse;width:100%;max-width:640px;">${htmlRows}</table>
+</body></html>`;
+
+  return { subject, text, html };
+}
+
+/**
+ * Customer acknowledgement — no MoveFlow links, no quote-ready / survey-booked claims.
+ */
+export function buildCustomerAcknowledgementContent(
+  fullName: string
+): { subject: string; text: string; html: string } {
+  const firstName = firstNameFromFullName(fullName);
+  const safeFirst = escapeHtml(firstName);
+  const whatsappUrl = ENQUIRY_SURVEY_WHATSAPP_URL;
+  const subject = "We’ve received your moving enquiry";
+
+  const text = [
+    `Hi ${firstName},`,
+    "",
+    "Thank you for contacting South West London Removals.",
+    "",
+    "Our team will be in touch shortly to discuss your move.",
+    "",
+    "Alternatively, WhatsApp us to arrange a free, no-obligation home survey:",
+    whatsappUrl,
+    "",
+    "Kind regards,",
+    "South West London Removals",
+  ].join("\n");
+
+  const html = `<!DOCTYPE html><html><body style="font-family:Arial,Helvetica,sans-serif;color:#1a1a1a;line-height:1.5;">
+<p>Hi ${safeFirst},</p>
+<p>Thank you for contacting South West London Removals.</p>
+<p>Our team will be in touch shortly to discuss your move.</p>
+<p>Alternatively, WhatsApp us to arrange a free, no-obligation home survey:</p>
+<p style="margin:24px 0;">
+  <a href="${escapeHtml(whatsappUrl)}" style="display:inline-block;background:#25D366;color:#ffffff;text-decoration:none;font-weight:600;padding:12px 22px;border-radius:999px;">Message us on WhatsApp</a>
+</p>
+<p style="font-size:14px;color:#555;">Or open: <a href="${escapeHtml(whatsappUrl)}" style="color:#0F3D2E;">${escapeHtml(whatsappUrl)}</a></p>
+<p>Kind regards,<br/>South West London Removals</p>
 </body></html>`;
 
   return { subject, text, html };
