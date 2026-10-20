@@ -13,6 +13,7 @@ import {
   EMAIL_HREF,
   BUSINESS_ADDRESS_LINE,
   BUSINESS_ADDRESS_MAPS_HREF,
+  WHATSAPP,
   WHATSAPP_HREF,
   WHATSAPP_SURVEY_HREF,
 } from "@/lib/constants";
@@ -88,7 +89,7 @@ export default function ContactPage() {
             {
               icon: MessageCircle,
               title: "WhatsApp",
-              detail: "Fastest response",
+              detail: WHATSAPP,
               href: WHATSAPP_HREF,
               cta: "Message us",
             },

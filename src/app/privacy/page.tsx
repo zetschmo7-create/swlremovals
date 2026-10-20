@@ -16,7 +16,7 @@ export default function PrivacyPage() {
       <Section className="!pt-0">
         <div className="max-w-3xl prose prose-neutral">
           <p className="text-charcoal-light leading-relaxed mb-6">
-            Last updated: June 2026
+            Last updated: 19 October 2026
           </p>
 
           {[
@@ -29,6 +29,11 @@ export default function PrivacyPage() {
               title: "How we use your information",
               content:
                 "Your information is used to provide quotations, coordinate your move, communicate with you about your booking, and improve our services. We do not sell your personal data to third parties.",
+            },
+            {
+              title: "Optional analytics",
+              content:
+                "Google Analytics loads only if you choose Allow analytics. It measures visits and interactions such as phone and WhatsApp button clicks or preparation of a quotation request. These events do not include the contact details or moving information you enter in the form. A button click is not treated as proof that an enquiry or booking was completed. You can keep analytics off or change your choice using Analytics settings. Our form prepares a WhatsApp message for you to review and send; selecting a video does not upload it to this website.",
             },
             {
               title: "Data retention",

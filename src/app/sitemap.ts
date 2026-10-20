@@ -2,6 +2,7 @@ import type { MetadataRoute } from "next";
 import { SITE_URL } from "@/lib/constants";
 import { AREAS } from "@/lib/areas";
 import { getAllLocationPages, locationPath } from "@/data/locationPages";
+import { getBlogPosts } from "@/lib/blog";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const staticPages = [
@@ -18,6 +19,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/quote",
     "/privacy",
     "/terms",
+    "/blog",
   ];
 
   const staticEntries = staticPages.map((path) => ({
@@ -41,5 +43,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 0.9,
   }));
 
-  return [...staticEntries, ...locationEntries, ...areaEntries];
+  const blogEntries = getBlogPosts().map((post) => ({
+    url: `${SITE_URL}/blog/${post.slug}`,
+    lastModified: new Date(post.publishedDate),
+    changeFrequency: "monthly" as const,
+    priority: 0.7,
+    images: [post.featureImage],
+  }));
+  return [...staticEntries, ...locationEntries, ...areaEntries, ...blogEntries];
 }

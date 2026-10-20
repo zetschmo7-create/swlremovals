@@ -39,6 +39,7 @@ const MORE_AREAS = [
 
 const COMPANY_LINKS = [
   { label: "About", href: "/about" },
+  { label: "Moving advice", href: "/blog" },
   { label: "Contact", href: "/contact" },
   { label: "Get a Quote", href: "/quote" },
   { label: "Privacy Policy", href: "/privacy" },

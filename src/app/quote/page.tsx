@@ -25,7 +25,7 @@ export default function QuotePage() {
       <PageHero
         eyebrow="Fixed quotations"
         title="Request your quote"
-        description="Complete the form below or send a WhatsApp walkthrough for a faster response."
+        description="Prepare your move details below, then send your request through WhatsApp. You can also send a recorded walkthrough."
       />
       <Section className="!pt-0 -mt-8">
         <FadeIn>
@@ -85,8 +85,8 @@ export default function QuotePage() {
                 Prefer WhatsApp?
               </h3>
               <p className="text-sm text-charcoal-light mb-4">
-                Record a quick walkthrough of your home and receive a fixed
-                quotation, typically within a few hours.
+                Record a walkthrough of your rooms and access, then send it for
+                assessment and a fixed quotation for the agreed work.
               </p>
               <Button
                 href={WHATSAPP_SURVEY_HREF}

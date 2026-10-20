@@ -76,7 +76,11 @@ export function LocationPageTemplate({ location }: Props) {
       <PageHero
         eyebrow={`${location.locationName} · ${location.postcodes.join(", ")}`}
         title={location.h1}
-        description={location.intro.slice(0, 200) + "…"}
+        description={
+          location.slug === "wimbledon-removals"
+            ? location.metaDescription
+            : location.intro.slice(0, 200) + "…"
+        }
       >
         <div className="flex flex-col sm:flex-row gap-3">
           <QuoteButton size="lg" variant="secondary">
@@ -212,6 +216,39 @@ export function LocationPageTemplate({ location }: Props) {
                 <p className="text-lg text-charcoal-light leading-relaxed mb-6">
                   {location.parkingAccessNotes}
                 </p>
+                {location.slug === "wimbledon-removals" && (
+                  <div className="mb-8 rounded-2xl border border-border bg-cream p-5 md:p-6">
+                    <h3 className="font-display text-lg font-semibold text-charcoal mb-3">
+                      Plan your Wimbledon parking before moving day
+                    </h3>
+                    <p className="text-charcoal-light leading-relaxed">
+                      Check the restrictions at both addresses and agree who
+                      will arrange any permissions. Merton Council requires at
+                      least ten full working days for a parking suspension or
+                      yellow line waiver application. Confirm the space needed
+                      with us, then check the council&apos;s current{" "}
+                      <a
+                        href="https://www.merton.gov.uk/streets-parking-transport/parking/suspensions"
+                        className="font-medium text-green-800 underline underline-offset-4 hover:text-green-900"
+                      >
+                        parking suspension guidance and charges
+                      </a>
+                      .
+                    </p>
+                    <p className="mt-3 text-charcoal-light leading-relaxed">
+                      For the admin around your move, use Merton&apos;s{" "}
+                      <a
+                        href="https://www.merton.gov.uk/council-tax-benefits-and-housing/moving-house"
+                        className="font-medium text-green-800 underline underline-offset-4 hover:text-green-900"
+                      >
+                        moving house services
+                      </a>{" "}
+                      to find Council Tax, waste collection and local
+                      registration information. If either address is outside
+                      Merton, check that council&apos;s requirements separately.
+                    </p>
+                  </div>
+                )}
                 <h3 className="font-medium text-charcoal mb-3">
                   Roads we know well
                 </h3>
@@ -272,6 +309,7 @@ export function LocationPageTemplate({ location }: Props) {
               </div>
             </FadeIn>
 
+            {location.slug !== "wimbledon-removals" && (
             <FadeIn delay={0.25}>
               <div>
                 <h2 className="font-display text-2xl md:text-3xl font-semibold text-charcoal mb-6">
@@ -303,6 +341,7 @@ export function LocationPageTemplate({ location }: Props) {
                 </div>
               </div>
             </FadeIn>
+            )}
           </div>
 
           <div className="space-y-6">
@@ -329,6 +368,7 @@ export function LocationPageTemplate({ location }: Props) {
                   </Button>
                 </div>
 
+                {location.slug !== "wimbledon-removals" && (
                 <blockquote className="mt-6 pt-6 border-t border-border">
                   <Quote className="w-6 h-6 text-green-800/20 mb-3" />
                   <p className="text-sm text-charcoal-light leading-relaxed italic">
@@ -343,6 +383,7 @@ export function LocationPageTemplate({ location }: Props) {
                     </p>
                   </footer>
                 </blockquote>
+                )}
               </Card>
             </FadeIn>
           </div>

@@ -5,12 +5,12 @@ export const SITE_DESCRIPTION =
 
 export const PHONE = "020 8080 5865";
 export const PHONE_INTERNATIONAL = "+442080805865";
-export const PHONE_HREF = "tel:+442080805865";
-export const WHATSAPP = "+44 7520 636509";
+export const PHONE_HREF = `tel:${PHONE_INTERNATIONAL}`;
+export const WHATSAPP = "07522 908555";
 export const WHATSAPP_HREF =
-  "https://wa.me/447520636509?text=Hello%2C%20I%27d%20like%20to%20discuss%20a%20removal.";
+  "https://wa.me/447522908555?text=Hello%2C%20I%27d%20like%20to%20discuss%20a%20removal.";
 export const WHATSAPP_SURVEY_HREF =
-  "https://wa.me/447520636509?text=Hello%2C%20I%27d%20like%20to%20send%20a%20walkthrough%20video%20for%20a%20quotation.";
+  "https://wa.me/447522908555?text=Hello%2C%20I%27d%20like%20to%20send%20a%20walkthrough%20video%20for%20a%20quotation.";
 export const EMAIL = "info@swlremovals.co.uk";
 export const EMAIL_HREF = "mailto:info@swlremovals.co.uk";
 
