@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { trackLeadInteraction } from "@/lib/lead-tracking";
 import { Check, Loader2, MessageCircle } from "lucide-react";
 import {
@@ -75,6 +75,7 @@ function Label({
 }
 
 export function EnquiryQuoteForm({ variant = "modal", onSuccess }: Props) {
+  const formId = useId();
   const [values, setValues] = useState<EnquiryFormValues>(INITIAL);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -208,9 +209,9 @@ export function EnquiryQuoteForm({ variant = "modal", onSuccess }: Props) {
         className="absolute -left-[9999px] h-0 w-0 overflow-hidden opacity-0"
         aria-hidden
       >
-        <label htmlFor="swl_hp_token">Leave blank</label>
+        <label htmlFor={`${formId}-swl_hp_token`}>Leave blank</label>
         <input
-          id="swl_hp_token"
+          id={`${formId}-swl_hp_token`}
           name="swl_hp_token"
           type="text"
           tabIndex={-1}
@@ -228,11 +229,11 @@ export function EnquiryQuoteForm({ variant = "modal", onSuccess }: Props) {
 
       <div className="grid gap-4 md:grid-cols-2">
         <div>
-          <Label htmlFor="fullName" required>
+          <Label htmlFor={`${formId}-fullName`} required>
             Full name
           </Label>
           <input
-            id="fullName"
+            id={`${formId}-fullName`}
             name="fullName"
             autoComplete="name"
             className={fieldClass(Boolean(errors.fullName))}
@@ -246,9 +247,9 @@ export function EnquiryQuoteForm({ variant = "modal", onSuccess }: Props) {
         </div>
 
         <div>
-          <Label htmlFor="phone">Phone</Label>
+          <Label htmlFor={`${formId}-phone`}>Phone</Label>
           <input
-            id="phone"
+            id={`${formId}-phone`}
             name="phone"
             type="tel"
             autoComplete="tel"
@@ -262,11 +263,11 @@ export function EnquiryQuoteForm({ variant = "modal", onSuccess }: Props) {
         </div>
 
         <div className="md:col-span-2">
-          <Label htmlFor="email" required>
+          <Label htmlFor={`${formId}-email`} required>
             Email
           </Label>
           <input
-            id="email"
+            id={`${formId}-email`}
             name="email"
             type="email"
             autoComplete="email"
@@ -281,11 +282,11 @@ export function EnquiryQuoteForm({ variant = "modal", onSuccess }: Props) {
         </div>
 
         <div>
-          <Label htmlFor="propertyType" required>
+          <Label htmlFor={`${formId}-propertyType`} required>
             Property type
           </Label>
           <select
-            id="propertyType"
+            id={`${formId}-propertyType`}
             name="propertyType"
             className={fieldClass(Boolean(errors.propertyType))}
             value={values.propertyType}
@@ -305,11 +306,11 @@ export function EnquiryQuoteForm({ variant = "modal", onSuccess }: Props) {
         </div>
 
         <div>
-          <Label htmlFor="bedrooms" required>
+          <Label htmlFor={`${formId}-bedrooms`} required>
             Bedrooms
           </Label>
           <select
-            id="bedrooms"
+            id={`${formId}-bedrooms`}
             name="bedrooms"
             className={fieldClass(Boolean(errors.bedrooms))}
             value={values.bedrooms}
@@ -329,11 +330,11 @@ export function EnquiryQuoteForm({ variant = "modal", onSuccess }: Props) {
         </div>
 
         <div>
-          <Label htmlFor="collectionPostcode" required>
+          <Label htmlFor={`${formId}-collectionPostcode`} required>
             Collection postcode
           </Label>
           <input
-            id="collectionPostcode"
+            id={`${formId}-collectionPostcode`}
             name="collectionPostcode"
             autoComplete="postal-code"
             className={fieldClass(Boolean(errors.collectionPostcode))}
@@ -349,11 +350,11 @@ export function EnquiryQuoteForm({ variant = "modal", onSuccess }: Props) {
         </div>
 
         <div>
-          <Label htmlFor="deliveryPostcode" required>
+          <Label htmlFor={`${formId}-deliveryPostcode`} required>
             Delivery postcode
           </Label>
           <input
-            id="deliveryPostcode"
+            id={`${formId}-deliveryPostcode`}
             name="deliveryPostcode"
             className={fieldClass(Boolean(errors.deliveryPostcode))}
             value={values.deliveryPostcode}
@@ -368,11 +369,11 @@ export function EnquiryQuoteForm({ variant = "modal", onSuccess }: Props) {
         </div>
 
         <div>
-          <Label htmlFor="timeframe" required>
+          <Label htmlFor={`${formId}-timeframe`} required>
             When are you moving?
           </Label>
           <select
-            id="timeframe"
+            id={`${formId}-timeframe`}
             name="timeframe"
             className={fieldClass(Boolean(errors.timeframe))}
             value={values.timeframe}
@@ -392,9 +393,9 @@ export function EnquiryQuoteForm({ variant = "modal", onSuccess }: Props) {
         </div>
 
         <div>
-          <Label htmlFor="moveDate">Exact move date (if known)</Label>
+          <Label htmlFor={`${formId}-moveDate`}>Exact move date (if known)</Label>
           <input
-            id="moveDate"
+            id={`${formId}-moveDate`}
             name="moveDate"
             type="date"
             className={fieldClass(Boolean(errors.moveDate))}
@@ -407,11 +408,11 @@ export function EnquiryQuoteForm({ variant = "modal", onSuccess }: Props) {
         </div>
 
         <div>
-          <Label htmlFor="collectionAddress">
+          <Label htmlFor={`${formId}-collectionAddress`}>
             Collection street address (optional)
           </Label>
           <input
-            id="collectionAddress"
+            id={`${formId}-collectionAddress`}
             name="collectionAddress"
             autoComplete="street-address"
             className={fieldClass(Boolean(errors.collectionAddress))}
@@ -426,11 +427,11 @@ export function EnquiryQuoteForm({ variant = "modal", onSuccess }: Props) {
         </div>
 
         <div>
-          <Label htmlFor="deliveryAddress">
+          <Label htmlFor={`${formId}-deliveryAddress`}>
             Delivery street address (optional)
           </Label>
           <input
-            id="deliveryAddress"
+            id={`${formId}-deliveryAddress`}
             name="deliveryAddress"
             className={fieldClass(Boolean(errors.deliveryAddress))}
             value={values.deliveryAddress}
