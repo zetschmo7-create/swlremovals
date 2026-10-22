@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { trackLeadInteraction } from "@/lib/lead-tracking";
 import { Check, Loader2, MessageCircle } from "lucide-react";
 import {
   BEDROOM_OPTIONS,
@@ -79,6 +80,13 @@ export function EnquiryQuoteForm({ variant = "modal", onSuccess }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [succeeded, setSucceeded] = useState(false);
+  const openTracked = useRef(false);
+
+  useEffect(() => {
+    if (openTracked.current) return;
+    openTracked.current = true;
+    trackLeadInteraction("quote_form_open", `native_enquiry_${variant}`);
+  }, [variant]);
 
   const update = useCallback((patch: Partial<EnquiryFormValues>) => {
     setValues((prev) => ({ ...prev, ...patch }));
@@ -141,6 +149,8 @@ export function EnquiryQuoteForm({ variant = "modal", onSuccess }: Props) {
         return;
       }
 
+      // This records provider acceptance, not inbox delivery or a booked move.
+      trackLeadInteraction("quote_form_ready", `native_enquiry_${variant}_accepted`);
       setSucceeded(true);
       onSuccess?.();
     } catch {

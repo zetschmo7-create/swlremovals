@@ -12,7 +12,7 @@ import { WHATSAPP_SURVEY_HREF } from "@/lib/constants";
 export const metadata = createMetadata({
   title: "Get a Removals Quote | Fixed Quotations | SWL Removals",
   description:
-    "Request a fixed quotation for your South West London or Surrey move. Multi-step form or WhatsApp walkthrough video.",
+    "Request a fixed quotation for your South West London or Surrey move. Send your details using our enquiry form or a recorded WhatsApp walkthrough.",
   path: "/quote",
 });
 
@@ -25,7 +25,7 @@ export default function QuotePage() {
       <PageHero
         eyebrow="Fixed quotations"
         title="Request your quote"
-        description="Prepare your move details below, then send your request through WhatsApp. You can also send a recorded walkthrough."
+        description="Send your move details using the form below. Our team will be in touch shortly. You can also send a recorded WhatsApp walkthrough."
       />
       <Section className="!pt-0 -mt-8">
         <FadeIn>
