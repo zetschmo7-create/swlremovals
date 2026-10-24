@@ -22,7 +22,7 @@ export default function StoragePage() {
       features={[
         "Secure, monitored storage facilities",
         "Short and long-term options",
-        "Collection and delivery included",
+        "Collection and delivery planning",
         "Inventory tracking",
         "Ideal for property chains",
         "Climate-appropriate storage",
@@ -38,12 +38,12 @@ export default function StoragePage() {
         {
           question: "Are my items insured in storage?",
           answer:
-            "Yes. Full insurance coverage applies during storage as part of our removals service.",
+            "Ask us to confirm in writing what cover applies to your stored belongings, including any limits, exclusions and conditions, before booking. Check your own contents policy too.",
         },
         {
           question: "Can you collect and deliver to storage?",
           answer:
-            "Yes. Collection from your property and delivery when you are ready is all part of the service.",
+            "We can arrange collection from your property and delivery from storage. Confirm the dates, access arrangements and any charges in your written quotation before booking.",
         },
       ]}
       extraContent={<StorageSeoContent />}
