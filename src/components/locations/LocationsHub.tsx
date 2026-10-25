@@ -13,6 +13,7 @@ import { QuoteButton } from "@/components/quote/QuoteButton";
 import { CTABanner } from "@/components/home/CTABanner";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { SITE_NAME, SITE_URL } from "@/lib/constants";
+import { organizationReference } from "@/lib/schema";
 import { IMAGES } from "@/lib/images";
 import { ChevronRight, ArrowRight } from "lucide-react";
 
@@ -49,7 +50,7 @@ export function LocationsHub() {
       "Premium removals locations across South West London, Central London, Surrey and commuter towns.",
     url: pageUrl,
     isPartOf: { "@id": `${SITE_URL}/#website` },
-    publisher: { "@id": `${SITE_URL}/#organization` },
+    publisher: organizationReference(),
     mainEntity: {
       "@type": "ItemList",
       numberOfItems: allLocations.length,
