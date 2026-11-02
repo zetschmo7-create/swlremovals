@@ -198,13 +198,19 @@ export function Footer() {
           <FooterContactRow />
         </div>
 
-        <div className="mt-6 pt-6 border-t border-white/10 flex flex-col sm:flex-row justify-between items-center gap-3">
-          <p className="text-xs text-white/40">
-            © {new Date().getFullYear()} {SITE_NAME}. All rights reserved.
+        <div className="mt-6 pt-6 border-t border-white/10 flex flex-col gap-3">
+          <p className="text-xs leading-relaxed text-white/45 text-center sm:text-left">
+            South West London Removals is now part of Ryan Removals Residential
+            Limited.
           </p>
-          <p className="text-xs text-white/40 text-center sm:text-right">
-            Fully insured · Fixed quotations · Wimbledon & South West London
-          </p>
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-3">
+            <p className="text-xs text-white/40">
+              © {new Date().getFullYear()} {SITE_NAME}. All rights reserved.
+            </p>
+            <p className="text-xs text-white/40 text-center sm:text-right">
+              Fully insured · Fixed quotations · Wimbledon & South West London
+            </p>
+          </div>
         </div>
       </div>
     </footer>
