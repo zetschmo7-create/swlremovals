@@ -36,3 +36,18 @@ test('agency creation is atomic and repairs an interrupted earlier import',async
  assert.deepEqual(JSON.parse(String(applyCommand(state,create).result)),{duplicate:true});
  state.leads={value:[]};assert.deepEqual(JSON.parse(String(applyCommand(state,create).result)),{id:'new',recovered:true});assert.deepEqual(applyCommand(state,['SMEMBERS','leads']).result,['new']);
 });
+
+test('daily queue enforces five total emails and excludes unpermitted or stopped contacts',async()=>{
+ const {dailyQueue,normaliseSettings}=await import('./policy');
+ const base={email:'info@example.com',consent:'Requested information by phone',sentAt:'',suppressed:false,repliedAt:'',status:'new',createdAt:'2026-11-09T00:00:00Z'};
+ const leads=Array.from({length:9},(_,i)=>({...base,id:String(i)})) as import('./store').Lead[];
+ const s=normaliseSettings({dailyCap:100,autoInitial:true});assert.equal(s.dailyCap,5);assert.equal(dailyQueue(leads,s,0).length,5);assert.equal(dailyQueue(leads,s,4).length,1);assert.equal(dailyQueue(leads,s,5).length,0);
+ const blocked=[{consent:''},{suppressed:true},{repliedAt:'2026-11-09'},{status:'uncertain'},{status:'sending'},{status:'declined'},{sentAt:'2026-11-09'}].map((p,i)=>({...base,id:String(i),...p})) as import('./store').Lead[];
+ assert.equal(dailyQueue(blocked,s,0).length,0);assert.equal(dailyQueue(leads,normaliseSettings(),0).length,0);
+});
+test('manual sends and follow-ups consume one shared atomic daily allowance',async()=>{
+ const {applyCommand}=await import('./blob-state');const state:Record<string,{value:unknown;expires?:number}>={};
+ const command=['EVAL',"local n=tonumber(redis.call('GET',KEYS[1]) or '0'); if n>=tonumber(ARGV[1]) then return -1 end; n=redis.call('INCR',KEYS[1]); redis.call('EXPIRE',KEYS[1],172800); return n",1,'daily:2026-11-09',5];
+ assert.deepEqual(Array.from({length:9},()=>applyCommand(state,command).result),[1,2,3,4,5,-1,-1,-1,-1]);
+});
+test('daily limits use the UK calendar date across summer and winter',async()=>{const {londonDay}=await import('./policy');assert.equal(londonDay(new Date('2026-07-01T23:30:00Z')),'2026-07-02');assert.equal(londonDay(new Date('2026-11-09T23:30:00Z')),'2026-11-09')});

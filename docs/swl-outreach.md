@@ -28,3 +28,9 @@ No bulk initial campaign is launched on deployment. Daily send cap defaults to t
 ## Validation
 
 `npx tsc --noEmit`; `npm run build`; `node --import tsx --test src/lib/outreach/outreach.test.ts` when tsx is installed.
+
+## Five-email daily pilot
+
+The daily cron at 08:00 UTC now supports `autoResearch` and `autoInitial`, separately from `autoFollowup`. All switches default off until saved by an administrator. Research scans at most five pages once per UK calendar day, excludes existing agency domains from search, and leaves permission blank. A missing Firecrawl key is shown as a blocker rather than pretending research ran. Initial sends require recorded permission and stop on replies, suppression, ambiguous prior sends or exhausted quota. The hard maximum is five total send attempts per UK calendar day, shared by dashboard sends, introductions and follow-ups; lowering the UI setting can reduce it further. The quota is claimed atomically before SMTP and is not refunded after ambiguous errors.
+
+`GET /api/outreach` includes a read-only automation preview and the last run summary. It never triggers research or sending. The daily worker records failures and eligibility/permission holds. Every recipient is checked again just before sending. Research credits are claimed once per day before work starts so worker retries cannot launch another paid search. Pause controls are rechecked between sends. Signature images are loaded from the fixed site asset and attached inline; if the asset is unavailable, no email is sent.

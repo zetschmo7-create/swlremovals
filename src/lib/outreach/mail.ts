@@ -1,3 +1,4 @@
+import { londonDay, MAX_DAILY_SENDS } from './policy';
 import nodemailer from 'nodemailer';
 import { ImapFlow } from 'imapflow';
 import { randomUUID } from 'node:crypto';
@@ -14,7 +15,8 @@ export async function sendLead(id:string,followup=false){return withLock('send:'
  if(followup&&(!lead.sentAt||lead.followupSentAt||!lead.followupAt||Date.parse(lead.followupAt)>Date.now()))throw new Error('No follow-up is due.');
  if(lead.status==='sending'||lead.status==='uncertain')throw new Error('Check the mailbox before retrying this send.');
  const c=mailConfig();if(!mailReady()||c.user.toLowerCase()!=='info@swlremovals.co.uk')throw new Error('The SWL Hostinger sender needs verification in Connections.');
- const config=await settings(),day=new Date().toISOString().slice(0,10);const count=await redis<number>(['EVAL',"local n=tonumber(redis.call('GET',KEYS[1]) or '0'); if n>=tonumber(ARGV[1]) then return -1 end; n=redis.call('INCR',KEYS[1]); redis.call('EXPIRE',KEYS[1],172800); return n",1,PREFIX+'daily:'+day,config.dailyCap]);if(count===-1)throw new Error('Daily sending cap reached.');
+ const signatureResponse=await fetch(ORIGIN+'/outreach-signature.jpg',{signal:AbortSignal.timeout(15000)});if(!signatureResponse.ok)throw new Error('The branded signature is unavailable. Sending paused.');const signature=Buffer.from(await signatureResponse.arrayBuffer());if(signature.length>500000||signature[0]!==255||signature[1]!==216)throw new Error('The branded signature could not be verified.');
+ const config=await settings(),day=londonDay();const count=await redis<number>(['EVAL',"local n=tonumber(redis.call('GET',KEYS[1]) or '0'); if n>=tonumber(ARGV[1]) then return -1 end; n=redis.call('INCR',KEYS[1]); redis.call('EXPIRE',KEYS[1],172800); return n",1,PREFIX+'daily:'+day,Math.min(MAX_DAILY_SENDS,config.dailyCap)]);if(count===-1)throw new Error('Daily sending cap reached.');
  const token=randomUUID(),messageId=`<swl-outreach-${randomUUID()}@swlremovals.co.uk>`;
  const subject=followup?'Re: '+lead.subject:lead.subject;
  const body=followup?`Hi ${lead.company} team,\n\nJust following up on my introduction below. Happy to chat if having a local removals contact would be useful.\n\nKind regards,\nPatrick\nSouth West London Removals\n\n---\n${lead.body}`:lead.body;
@@ -24,7 +26,7 @@ export async function sendLead(id:string,followup=false){return withLock('send:'
  await redis(['SET',PREFIX+'token:'+token,JSON.stringify({leadId:id,tracking:lead.tracking}), 'EX',31536000]);
  await patchLead(id,{status:'sending'});await addEvent({leadId:id,kind:'sending',subject,messageId,token});
  const transport=nodemailer.createTransport({host:c.host,port:c.port,secure:c.port===465,requireTLS:c.port!==465,auth:{user:c.user,pass:c.pass},connectionTimeout:12000,socketTimeout:25000});
- try{const result=await transport.sendMail({from:{name:'Patrick – South West London Removals',address:c.user},to:lead.email,replyTo:c.user,subject,text:body+'\n\nStop further emails: '+unsub,html:'<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.6;white-space:pre-wrap">'+escapeHtml(body)+'</div><p><a href="'+unsub+'">Stop further emails</a></p>'+(lead.tracking?'<img src="'+ORIGIN+'/api/outreach/track/'+token+'" width="1" height="1" alt="" />':''),messageId,inReplyTo:followup?previous?.messageId:undefined,references:followup?previous?.messageId:undefined,headers:{'List-Unsubscribe':`<${unsub}>`}});
+ try{const result=await transport.sendMail({from:{name:'Patrick | South West London Removals',address:c.user},to:lead.email,replyTo:c.user,subject,text:body+'\n\nStop further emails: '+unsub,html:'<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.6;white-space:pre-wrap">'+escapeHtml(body)+'</div><img src="cid:swl-signature" width="720" alt="Patrick | South West London Removals | Ryan Group" style="display:block;width:100%;max-width:720px;height:auto;border:0"><p><a href="'+unsub+'">Stop further emails</a></p>'+(lead.tracking?'<img src="'+ORIGIN+'/api/outreach/track/'+token+'" width="1" height="1" alt="" />':''),attachments:[{filename:'patrick-swl-signature.jpg',content:signature,contentType:'image/jpeg',cid:'swl-signature'}],messageId,inReplyTo:followup?previous?.messageId:undefined,references:followup?previous?.messageId:undefined,headers:{'List-Unsubscribe':`<${unsub}>`}});
  if(!result.accepted?.length)throw new Error('SMTP did not accept the recipient.');
  const now=new Date().toISOString();await patchLead(id,followup?{status:'sent',followupSentAt:now}:{status:'sent',sentAt:now,followupAt:new Date(Date.now()+5*86400000).toISOString()});await addEvent({leadId:id,kind:followup?'followup_sent':'sent',subject,messageId,detail:'Accepted by Hostinger SMTP; delivery is not confirmed.'});
  return {ok:true};
