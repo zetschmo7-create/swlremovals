@@ -4,14 +4,14 @@ URL: `/admin/outreach` (`/admin` redirects here). This uses its own login and do
 
 ## Configuration
 
-- Existing `KV_REST_API_URL`, `KV_REST_API_TOKEN`: durable records under `swl:outreach:v1:`.
+- Connected private Vercel Blob store `swl-outreach-private`: durable state at `swl-outreach/state-v1.json`. Uses fresh reads and ETag conditional writes to prevent lost updates. The previous Jarvis Redis integration was uninstalled and is not modified. Legacy KV support remains only when no Blob store is configured.
 - `OUTREACH_PASSWORD_HASH`: scrypt salt:hex hash; `OUTREACH_SESSION_SECRET`: random session/encryption secret. Changing the latter invalidates sessions and encrypted integration settings.
 - Existing `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`: SWL Hostinger mailbox. Only `info@swlremovals.co.uk` is allowed as sender. `IMAP_HOST` optionally overrides `imap.hostinger.com`.
-- `FIRECRAWL_API_KEY`, or an API key entered into the dashboard's Connections form. Stored AES-256-GCM encrypted in KV and never returned to the browser. ChatGPT OAuth does not provision this app's API access.
+- `FIRECRAWL_API_KEY`, or an API key entered into the dashboard's Connections form. Stored AES-256-GCM encrypted in private storage and never returned to the browser. ChatGPT OAuth does not provision this app's API access.
 - `CRON_SECRET`: protects daily 08:00 UTC reply-sync/follow-up job.
 - `OUTREACH_HOSTINGER_WEBHOOK_SECRET`: Hostinger `message.received` notification bearer secret. POST `/api/outreach/webhook` ignores notification content and performs an inbox reply check; it never sends mail.
 
-No secrets or runtime contact records are committed to Git. Authenticated mutations require same-origin requests; login attempts are rate limited in Redis. Pages and APIs are non-indexable; contact API responses are private/no-store.
+No secrets or runtime contact records are committed to Git. Authenticated mutations require same-origin requests; login attempts are rate limited in private storage. Pages and APIs are non-indexable; contact API responses are private/no-store.
 
 ## Workflow
 

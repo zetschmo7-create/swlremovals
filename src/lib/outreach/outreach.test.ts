@@ -15,3 +15,15 @@ test('suppressed, replied, unpermitted and ambiguous contacts cannot send',async
  await assert.rejects(sendLead('lead'));assert.equal(calls,3,'only lock, contact read and lock release; no sending');
  }globalThis.fetch=original;
 });
+
+test('durable command adapter preserves deduplication, lock ownership and expiry',async()=>{
+ const {applyCommand}=await import('./blob-state');const state:Record<string,{value:unknown;expires?:number}>={};
+ assert.equal(applyCommand(state,['SET','lock','owner','NX','EX',10],1000).result,'OK');
+ assert.equal(applyCommand(state,['SET','lock','other','NX','EX',10],1001).result,null);
+ assert.equal(applyCommand(state,['EVAL',"if redis.call('get',KEYS[1])==ARGV[1] then return redis.call('del',KEYS[1]) else return 0 end",1,'lock','other'],1002).result,0);
+ assert.equal(applyCommand(state,['SET','lock','next','NX','EX',10],12000).result,'OK');
+ const claim=['EVAL',"if redis.call('EXISTS',KEYS[1])==1 or redis.call('EXISTS',KEYS[2])==1 then return 0 end",2,'email:agency','domain:agency','lead'];
+ assert.equal(applyCommand(state,claim,12001).result,1);assert.equal(applyCommand(state,claim,12002).result,0);
+ applyCommand(state,['HSET','record','name','"Agency"','email','"info@example.com"']);applyCommand(state,['HSET','record','status','"sent"']);assert.deepEqual(applyCommand(state,['HGETALL','record']).result,['name','"Agency"','email','"info@example.com"','status','"sent"']);
+ applyCommand(state,['LPUSH','events','event1']);applyCommand(state,['LPUSH','events','event2']);assert.deepEqual(applyCommand(state,['LRANGE','events',0,1]).result,['event2','event1']);
+});

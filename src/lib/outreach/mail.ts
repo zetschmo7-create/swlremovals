@@ -2,7 +2,7 @@ import nodemailer from 'nodemailer';
 import { ImapFlow } from 'imapflow';
 import { randomUUID } from 'node:crypto';
 import { addEvent, allLeads, events, patchLead, PREFIX, readLead, redis, settings, withLock } from './store';
-const ORIGIN='https://swlremovals.co.uk';
+const ORIGIN='https://www.swlremovals.co.uk';
 export function mailConfig(){return {host:process.env.SMTP_HOST||'smtp.hostinger.com',port:Number(process.env.SMTP_PORT||465),user:process.env.SMTP_USER||'',pass:process.env.SMTP_PASS||''}}
 export function mailReady(){const c=mailConfig();return !!c.user&&!!c.pass}
 export function escapeHtml(v:string){return v.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!))}
@@ -30,7 +30,7 @@ export async function sendLead(id:string,followup=false){return withLock('send:'
  return {ok:true};
  }catch{await patchLead(id,{status:'uncertain'});await addEvent({leadId:id,kind:'send_uncertain',subject,messageId,detail:'Sending did not complete cleanly. Check the mailbox before any retry.'});throw new Error('Send could not be confirmed. Check Hostinger before retrying to avoid duplicates.');}finally{transport.close()}
 })}
-export async function testMailbox(){const c=mailConfig();if(!mailReady()||c.user.toLowerCase()!=='info@swlremovals.co.uk')throw new Error('SWL mailbox credentials are not configured.');const transport=nodemailer.createTransport({host:c.host,port:c.port,secure:c.port===465,requireTLS:c.port!==465,auth:{user:c.user,pass:c.pass},connectionTimeout:10000,socketTimeout:12000});try{await transport.verify()}finally{transport.close()}return {ok:true}}
+export async function testMailbox(){const c=mailConfig();if(!mailReady()||c.user.toLowerCase()!=='info@swlremovals.co.uk')throw new Error('SWL mailbox credentials are not configured.');const transport=nodemailer.createTransport({host:c.host,port:c.port,secure:c.port===465,requireTLS:c.port!==465,auth:{user:c.user,pass:c.pass},connectionTimeout:10000,socketTimeout:12000});try{await transport.verify()}finally{transport.close()}const inbox=new ImapFlow({host:process.env.IMAP_HOST||'imap.hostinger.com',port:993,secure:true,auth:{user:c.user,pass:c.pass},logger:false,connectionTimeout:12000,socketTimeout:15000});try{await inbox.connect();await inbox.mailboxOpen('INBOX',{readOnly:true})}finally{await inbox.logout().catch(()=>{})}return {ok:true}}
 export async function syncReplies(){return withLock('inbox',async()=>{
  const c=mailConfig();if(!mailReady())throw new Error('Mailbox is not configured.');
  const leads=(await allLeads()).filter(l=>l.sentAt),history=await events();

@@ -1,12 +1,14 @@
+import { blobCommand } from './blob-state';
 import { randomUUID, createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
 export const PREFIX = 'swl:outreach:v1:';
 export type Lead = { id: string; company: string; area: string; website: string; email: string; phone: string; source: string; createdAt: string; status: string; consent: string; notes: string; subject: string; body: string; sentAt: string; repliedAt: string; openedAt: string; followupAt: string; followupSentAt: string; suppressed: boolean; tracking: boolean };
 export type MailEvent = { id: string; leadId: string; kind: string; at: string; subject?: string; messageId?: string; detail?: string; token?: string };
 export async function redis<T = unknown>(command: unknown[]): Promise<T> {
+  if(process.env.BLOB_STORE_ID || process.env.BLOB_READ_WRITE_TOKEN) return blobCommand<T>(command);
   if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) throw new Error('Persistent storage is not configured.');
   const r = await fetch(process.env.KV_REST_API_URL, {method:'POST', headers:{Authorization:`Bearer ${process.env.KV_REST_API_TOKEN}`,'Content-Type':'application/json'}, body:JSON.stringify(command),cache:'no-store',signal:AbortSignal.timeout(15000)});
   if (!r.ok) throw new Error('Storage is temporarily unavailable.');
-  const d = await r.json(); if (d.error) throw new Error('Storage operation failed.'); return d.result as T;
+  const d = await r.json(); if (d.error) { console.error('SWL outreach storage command error:',String(d.error).slice(0,200)); throw new Error('Storage operation failed.'); } return d.result as T;
 }
 export async function readLead(id: string): Promise<Lead | null> {
   const raw = await redis<string[]>(['HGETALL',PREFIX+'lead:'+id]); if (!raw?.length) return null;
