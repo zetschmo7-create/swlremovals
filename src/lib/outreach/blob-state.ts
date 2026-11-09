@@ -1,4 +1,4 @@
-import { get, put, BlobPreconditionFailedError } from '@vercel/blob';
+import { get, put, head, BlobNotFoundError, BlobPreconditionFailedError } from '@vercel/blob';
 export type Snapshot=Record<string,{value:unknown;expires?:number}>;
 const PATH='swl-outreach/state-v1.json';
 /** The small SWL workspace uses a private, version-checked document. No public contact URLs. */
@@ -38,12 +38,18 @@ export function applyCommand(state:Snapshot,command:unknown[],now=Date.now()):{r
 }
 export async function blobCommand<T>(command:unknown[]):Promise<T>{
  for(let attempt=0;attempt<12;attempt++){
+  const mutating=!['GET','HGETALL','SMEMBERS','LRANGE'].includes(String(command[0]));
+  // The API's conditional-write ETag comes from head(), not the HTTP GET header.
+  // Read it before the body: a concurrent update then causes a safe failed CAS.
+  let metadata:Awaited<ReturnType<typeof head>>|null=null;
+  if(mutating){try{metadata=await head(PATH)}catch(e){if(!(e instanceof BlobNotFoundError))throw e}}
   const current=await get(PATH,{access:'private',useCache:false});
+  if(mutating&&!!metadata!==!!current)continue;
   const state:Snapshot=current?.statusCode===200?JSON.parse(await new Response(current.stream).text()):{};
   const {result,changed}=applyCommand(state,command);
   if(!changed)return result as T;
   try{const body=JSON.stringify(state);if(body.length>8000000)throw new Error('Workspace storage limit reached. Export and archive old contacts.');
-   await put(PATH,body,{access:'private',contentType:'application/json',addRandomSuffix:false,allowOverwrite:!!current,ifMatch:current?.blob.etag,cacheControlMaxAge:60});return result as T;
+   await put(PATH,body,{access:'private',contentType:'application/json',addRandomSuffix:false,allowOverwrite:!!metadata,ifMatch:metadata?.etag,cacheControlMaxAge:60});return result as T;
   }catch(e){if(e instanceof BlobPreconditionFailedError||(e instanceof Error&&/precondition|already exists/i.test(e.message)))continue;throw e}
  }
  throw new Error('Another update is in progress. Please try again.');
