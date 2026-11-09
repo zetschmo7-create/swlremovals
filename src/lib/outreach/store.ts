@@ -24,9 +24,18 @@ export async function addLead(input: Partial<Lead>) {
  const website=String(input.website||'').trim(); if(website && !publicUrl(website)) throw new Error('Use a public HTTPS website.');
  const id=randomUUID(), key=email?'email:'+email:'domain:'+domain(website)+':'+company.toLowerCase();
  const agency=domain(website)||email.split('@')[1]||company.toLowerCase();
- const claimed=await redis<number>(['EVAL',"if redis.call('EXISTS',KEYS[1])==1 or redis.call('EXISTS',KEYS[2])==1 then return 0 end; redis.call('SET',KEYS[1],ARGV[1]); redis.call('SET',KEYS[2],ARGV[1]); return 1",2,PREFIX+'dedup:'+key,PREFIX+'agency:'+agency,id]); if(!claimed) throw new Error('This agency or email is already in your SWL list.');
  const lead:Lead={id,company,email,website,area:String(input.area||'').slice(0,150),phone:String(input.phone||'').slice(0,50),source:String(input.source||website).slice(0,2000),createdAt:new Date().toISOString(),status:'new',consent:'',notes:'',subject:'A local removals partner for your clients',body:draft(company),sentAt:'',repliedAt:'',openedAt:'',followupAt:'',followupSentAt:'',suppressed:false,tracking:false};
- try{await patchLead(id,lead);await redis(['SADD',PREFIX+'leads',id]);}catch(e){await redis(['DEL',PREFIX+'dedup:'+key,PREFIX+'agency:'+agency]);throw e} return lead;
+ const outcome=JSON.parse(await redis<string>(['EVAL',`-- SWL_CREATE_LEAD
+local existing=redis.call('GET',KEYS[1]) or redis.call('GET',KEYS[2]);
+if existing and redis.call('HGET',ARGV[3]..existing,'id') then
+ if redis.call('SISMEMBER',KEYS[4],existing)==1 then return cjson.encode({duplicate=true}) end;
+ redis.call('SADD',KEYS[4],existing); return cjson.encode({id=existing,recovered=true});
+end;
+redis.call('SET',KEYS[1],ARGV[1]); redis.call('SET',KEYS[2],ARGV[1]);
+for field,value in pairs(cjson.decode(ARGV[2])) do redis.call('HSET',KEYS[3],field,cjson.encode(value)) end;
+redis.call('SADD',KEYS[4],ARGV[1]); return cjson.encode({id=ARGV[1]});`,4,PREFIX+'dedup:'+key,PREFIX+'agency:'+agency,PREFIX+'lead:'+id,PREFIX+'leads',id,JSON.stringify(lead),PREFIX+'lead:']));
+ if(outcome.duplicate)throw new Error('This agency or email is already in your SWL list.');
+ return outcome.recovered?(await readLead(outcome.id))!:lead;
 }
 export function publicUrl(value:string) {try{const u=new URL(value);return u.protocol==='https:'&&!u.username&&!u.password&&!u.port&&u.hostname.includes('.')&&!/^(localhost|127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.)/.test(u.hostname)&&!u.hostname.includes(':')&&!/^\d+(\.\d+)*$/.test(u.hostname)&&!/\.(local|internal|test)$/.test(u.hostname)}catch{return false}}
 export async function addEvent(event: Omit<MailEvent,'id'|'at'>) { const e={...event,id:randomUUID(),at:new Date().toISOString()};await redis(['LPUSH',PREFIX+'events',JSON.stringify(e)]);await redis(['LTRIM',PREFIX+'events',0,1999]);return e; }

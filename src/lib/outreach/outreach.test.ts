@@ -27,3 +27,12 @@ test('durable command adapter preserves deduplication, lock ownership and expiry
  applyCommand(state,['HSET','record','name','"Agency"','email','"info@example.com"']);applyCommand(state,['HSET','record','status','"sent"']);assert.deepEqual(applyCommand(state,['HGETALL','record']).result,['name','"Agency"','email','"info@example.com"','status','"sent"']);
  applyCommand(state,['LPUSH','events','event1']);applyCommand(state,['LPUSH','events','event2']);assert.deepEqual(applyCommand(state,['LRANGE','events',0,1]).result,['event2','event1']);
 });
+
+test('agency creation is atomic and repairs an interrupted earlier import',async()=>{
+ const {applyCommand}=await import('./blob-state');const state:Record<string,{value:unknown;expires?:number}>={'dedup:email':{value:'orphan'},'agency:domain':{value:'orphan'}};
+ const create=['EVAL','-- SWL_CREATE_LEAD',4,'dedup:email','agency:domain','lead:new','leads','new',JSON.stringify({id:'new',company:'Agency',email:'info@example.com'}),'lead:'];
+ assert.deepEqual(JSON.parse(String(applyCommand(state,create).result)),{id:'new'});
+ assert.deepEqual(applyCommand(state,['SMEMBERS','leads']).result,['new']);
+ assert.deepEqual(JSON.parse(String(applyCommand(state,create).result)),{duplicate:true});
+ state.leads={value:[]};assert.deepEqual(JSON.parse(String(applyCommand(state,create).result)),{id:'new',recovered:true});assert.deepEqual(applyCommand(state,['SMEMBERS','leads']).result,['new']);
+});

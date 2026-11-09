@@ -23,7 +23,17 @@ export function applyCommand(state:Snapshot,command:unknown[],now=Date.now()):{r
  else if(op==='EVAL'){
   // These are the four fixed atomic operations used by this app, not an arbitrary script interpreter.
   const script=c[1],n=Number(c[2]),keys=c.slice(3,3+n),args=c.slice(3+n),k=keys[0];
-  if(script.includes("redis.call('EXISTS'")){
+  if(script.includes('SWL_CREATE_LEAD')){
+   const existing=value(keys[0])||value(keys[1]),stored=existing?object(args[2]+String(existing)):null;
+   if(stored?.id){
+    if(arr(keys[3]).includes(String(existing))){result=JSON.stringify({duplicate:true});changed=false}
+    else{set(keys[3],[...new Set([...arr(keys[3]),String(existing)])]);result=JSON.stringify({id:existing,recovered:true})}
+   }else{
+    const lead=JSON.parse(args[1]);set(keys[0],args[0]);set(keys[1],args[0]);
+    set(keys[2],Object.fromEntries(Object.entries(lead).map(([k,v])=>[k,JSON.stringify(v)])));
+    set(keys[3],[...new Set([...arr(keys[3]),args[0]])]);result=JSON.stringify({id:args[0]});
+   }
+  }else if(script.includes("redis.call('EXISTS'")){
    if(keys.some(k=>value(k)!==undefined)){result=0;changed=false}else{keys.forEach(k=>set(k,args[0]));result=1}
   }else if(script.includes("redis.call('get'")){
    if(value(k)===args[0]){delete state[k];result=1}else{result=0;changed=false}
