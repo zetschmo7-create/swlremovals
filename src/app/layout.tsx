@@ -3,11 +3,11 @@ import { DM_Sans, Sora } from "next/font/google";
 import "./globals.css";
 import { SiteShell } from "@/components/layout/SiteShell";
 import { GoogleAnalytics } from "@/components/analytics/GoogleAnalytics";
+import { AttributionCapture } from "@/components/analytics/AttributionCapture";
 import { LeadInteractionTracking } from "@/components/analytics/LeadInteractionTracking";
 import { SeoFlowTracking } from "@/components/analytics/SeoFlowTracking";
 import { LocalBusinessSchema } from "@/components/seo/LocalBusinessSchema";
 import { defaultMetadata } from "@/lib/seo";
-import { IMAGES } from "@/lib/images";
 
 const dmSans = DM_Sans({
   variable: "--font-dm-sans",
@@ -25,13 +25,7 @@ const sora = Sora({
   preload: true,
 });
 
-export const metadata: Metadata = {
-  ...defaultMetadata,
-  icons: {
-    icon: IMAGES.favicon,
-    apple: IMAGES.favicon,
-  },
-};
+export const metadata: Metadata = defaultMetadata;
 
 export default function RootLayout({
   children,
@@ -53,6 +47,7 @@ export default function RootLayout({
         <LocalBusinessSchema />
         <GoogleAnalytics />
         <LeadInteractionTracking />
+        <AttributionCapture />
         <a
           href="#main-content"
           className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-charcoal focus:shadow-[var(--shadow-elevated)]"
