@@ -1,5 +1,5 @@
-import { createHash } from "crypto";
-import { NextResponse } from "next/server";
+import { createHash, randomUUID } from "crypto";
+import { after, NextResponse } from "next/server";
 import { validateEnquiryPayload } from "@/lib/enquiry";
 import {
   createSubmissionRef,
@@ -11,11 +11,43 @@ import {
   isDuplicateEnquiry,
   markEnquirySubmitted,
 } from "@/lib/enquiry-rate-limit";
+import {
+  sendMoveFlowWebsiteLead,
+  type EnquiryAttribution,
+} from "@/lib/moveflow-website-lead";
+
+/** Allow MoveFlow retry backoff (2s + 10s + 30s) after the email path returns. */
+export const maxDuration = 60;
 
 function clientKey(request: Request): string {
   const forwarded = request.headers.get("x-forwarded-for");
   const ip = forwarded?.split(",")[0]?.trim() || "unknown";
   return ip;
+}
+
+function parseAttribution(raw: unknown): EnquiryAttribution | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const source = raw as Record<string, unknown>;
+  const pick = (key: string) => {
+    const value = source[key];
+    return typeof value === "string" && value.trim()
+      ? value.trim().slice(0, 500)
+      : undefined;
+  };
+  const attribution: EnquiryAttribution = {
+    utm_source: pick("utm_source"),
+    utm_medium: pick("utm_medium"),
+    utm_campaign: pick("utm_campaign"),
+    utm_term: pick("utm_term"),
+    utm_content: pick("utm_content"),
+    gclid: pick("gclid"),
+    gbraid: pick("gbraid"),
+    wbraid: pick("wbraid"),
+    landing_page: pick("landing_page"),
+    referrer: pick("referrer"),
+    first_visit_at: pick("first_visit_at"),
+  };
+  return Object.values(attribution).some(Boolean) ? attribution : undefined;
 }
 
 export async function POST(request: Request) {
@@ -132,6 +164,7 @@ export async function POST(request: Request) {
   }
 
   const submissionRef = createSubmissionRef();
+  // Existing email delivery is the customer-facing success path and runs first.
   const result = await sendEnquiryEmail(validated.data, submissionRef);
 
   if (!result.ok) {
@@ -180,6 +213,44 @@ export async function POST(request: Request) {
   }
 
   markEnquirySubmitted(fingerprint);
+
+  // MoveFlow dry-run forward — never blocks or overrides email success.
+  const moveFlowSubmissionId = randomUUID();
+  const attribution = parseAttribution(body.attribution);
+  const userAgent = request.headers.get("user-agent") || undefined;
+  const ip =
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    request.headers.get("x-real-ip") ||
+    undefined;
+
+  after(async () => {
+    try {
+      await sendMoveFlowWebsiteLead({
+        data: validated.data,
+        phoneAsTyped: validated.data.phone,
+        collectionPostcodeAsTyped: validated.data.collectionPostcodeAsTyped,
+        deliveryPostcodeAsTyped: validated.data.deliveryPostcodeAsTyped,
+        consentAccepted: validated.data.consentAccepted,
+        consentAcceptedAt: validated.data.consentAccepted
+          ? new Date().toISOString()
+          : undefined,
+        attribution,
+        userAgent,
+        ip,
+        submissionId: moveFlowSubmissionId,
+      });
+    } catch {
+      // Email already succeeded — never surface MoveFlow failures to the client.
+      console.info(
+        JSON.stringify({
+          type: "moveflow_website_lead",
+          submissionId: moveFlowSubmissionId,
+          stage: "after_callback_error",
+          code: "unhandled",
+        })
+      );
+    }
+  });
 
   return NextResponse.json({
     ok: true,

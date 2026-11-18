@@ -7,7 +7,7 @@
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
-    "test": "npx tsx --test src/lib/jarvis/commercial-intelligence.test.ts src/lib/jarvis/ask-jarvis-commercial.test.ts src/lib/enquiry.test.ts"
+    "test": "npx tsx --test src/lib/jarvis/commercial-intelligence.test.ts src/lib/jarvis/ask-jarvis-commercial.test.ts src/lib/enquiry.test.ts src/lib/moveflow-website-lead.test.ts"
   },
   "dependencies": {
     "@vercel/blob": "^2.8.2",

@@ -30,15 +30,27 @@ export type EnquiryPayload = {
   propertyType: string;
   collectionPostcode: string;
   deliveryPostcode: string;
+  /** Postcodes as typed (trimmed only) for MoveFlow — never invent casing. */
+  collectionPostcodeAsTyped: string;
+  deliveryPostcodeAsTyped: string;
   bedrooms: string;
   timeframe: string;
   moveDate: string;
   collectionAddress: string;
   deliveryAddress: string;
   pageUrl: string;
+  /** Consent checkbox accepted at submit time */
+  consentAccepted: boolean;
   /** Honeypot — must stay empty */
   companyWebsite?: string;
 };
+
+/** Exact MoveFlow WhatsApp/contact consent label — do not edit without a new disclosure_version. */
+export const MOVEFLOW_CONSENT_DISCLOSURE_VERSION =
+  "swl-web-2026-11-17-checkbox";
+
+export const MOVEFLOW_CONSENT_DISCLOSURE_TEXT =
+  "I agree that South West London Removals may contact me about my moving enquiry by phone, email and WhatsApp, including to arrange my survey. I can reply STOP at any time to stop WhatsApp messages.";
 
 export const ENQUIRY_RECIPIENTS = [
   "appointments@ryanremovals-surveys.com",
@@ -79,17 +91,25 @@ export function validateEnquiryPayload(
     clean(raw.websiteUrlConfirm);
 
   const fullName = clean(raw.fullName);
+  // Phone: trim only — never rewrite country prefix / locale defaults.
   const phone = clean(raw.phone);
   const email = clean(raw.email);
   const propertyType = clean(raw.propertyType);
-  const collectionPostcode = clean(raw.collectionPostcode).toUpperCase();
-  const deliveryPostcode = clean(raw.deliveryPostcode).toUpperCase();
+  const collectionPostcodeAsTyped = clean(raw.collectionPostcode);
+  const deliveryPostcodeAsTyped = clean(raw.deliveryPostcode);
+  const collectionPostcode = collectionPostcodeAsTyped.toUpperCase();
+  const deliveryPostcode = deliveryPostcodeAsTyped.toUpperCase();
   const bedrooms = clean(raw.bedrooms);
   const timeframe = clean(raw.timeframe);
   const moveDate = clean(raw.moveDate);
   const collectionAddress = clean(raw.collectionAddress);
   const deliveryAddress = clean(raw.deliveryAddress);
   const pageUrl = clean(raw.pageUrl);
+  const consentAccepted =
+    raw.consentAccepted === true ||
+    raw.consentAccepted === "true" ||
+    raw.consentAccepted === 1 ||
+    raw.consentAccepted === "1";
 
   if (!fullName) errors.fullName = "Please enter your full name.";
   else if (fullName.length > 120) errors.fullName = "Name is too long.";
@@ -154,12 +174,15 @@ export function validateEnquiryPayload(
       propertyType,
       collectionPostcode,
       deliveryPostcode,
+      collectionPostcodeAsTyped,
+      deliveryPostcodeAsTyped,
       bedrooms,
       timeframe,
       moveDate,
       collectionAddress,
       deliveryAddress,
       pageUrl: pageUrl.slice(0, 500),
+      consentAccepted,
       companyWebsite,
     },
   };

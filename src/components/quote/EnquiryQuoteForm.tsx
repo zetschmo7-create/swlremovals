@@ -3,9 +3,11 @@
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { trackLeadInteraction } from "@/lib/lead-tracking";
 import { Check, Loader2, MessageCircle } from "lucide-react";
+import { getStoredAttribution } from "@/lib/attribution";
 import {
   BEDROOM_OPTIONS,
   ENQUIRY_SURVEY_WHATSAPP_HREF,
+  MOVEFLOW_CONSENT_DISCLOSURE_TEXT,
   PROPERTY_TYPES,
   TIMEFRAME_OPTIONS,
 } from "@/lib/enquiry";
@@ -23,6 +25,8 @@ export type EnquiryFormValues = {
   collectionAddress: string;
   deliveryAddress: string;
   companyWebsite: string;
+  /** Contact consent — unticked by default */
+  consentAccepted: boolean;
 };
 
 const INITIAL: EnquiryFormValues = {
@@ -38,6 +42,7 @@ const INITIAL: EnquiryFormValues = {
   collectionAddress: "",
   deliveryAddress: "",
   companyWebsite: "",
+  consentAccepted: false,
 };
 
 type Props = {
@@ -102,12 +107,14 @@ export function EnquiryQuoteForm({ variant = "modal", onSuccess }: Props) {
     setErrors({});
 
     try {
-      const { companyWebsite, ...leadFields } = values;
+      const { companyWebsite, consentAccepted, ...leadFields } = values;
       const response = await fetch("/api/enquiry", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...leadFields,
+          consentAccepted,
+          attribution: getStoredAttribution(),
           // Anti-autofill honeypot name — never use company/website semantics
           swl_hp_token: companyWebsite,
           pageUrl:
@@ -252,7 +259,10 @@ export function EnquiryQuoteForm({ variant = "modal", onSuccess }: Props) {
             id={`${formId}-phone`}
             name="phone"
             type="tel"
+            inputMode="tel"
             autoComplete="tel"
+            // Keep digits exactly as typed — no intl widget / locale rewrite
+            data-intl-tel-input="off"
             className={fieldClass(Boolean(errors.phone))}
             value={values.phone}
             onChange={(e) => update({ phone: e.target.value })}
@@ -443,6 +453,25 @@ export function EnquiryQuoteForm({ variant = "modal", onSuccess }: Props) {
             </p>
           ) : null}
         </div>
+      </div>
+
+      <div className="rounded-xl border border-border/70 bg-cream/40 px-3.5 py-3">
+        <label
+          htmlFor={`${formId}-consent`}
+          className="flex cursor-pointer items-start gap-3 text-sm leading-relaxed text-charcoal"
+        >
+          <input
+            id={`${formId}-consent`}
+            name="consentAccepted"
+            type="checkbox"
+            checked={values.consentAccepted}
+            onChange={(e) =>
+              update({ consentAccepted: e.target.checked })
+            }
+            className="mt-1 h-4 w-4 shrink-0 rounded border-border text-green-800 focus:ring-green-700/30"
+          />
+          <span>{MOVEFLOW_CONSENT_DISCLOSURE_TEXT}</span>
+        </label>
       </div>
 
       {submitError ? (
