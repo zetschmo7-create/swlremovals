@@ -185,6 +185,8 @@ export function buildMoveFlowWebsiteLeadPayload(
       : undefined,
   });
 
+  const notes = input.data.notes?.trim().slice(0, 2000) || undefined;
+
   const move = omitEmpty({
     from: Object.keys(from).length ? from : undefined,
     to: Object.keys(to).length ? to : undefined,
@@ -192,6 +194,7 @@ export function buildMoveFlowWebsiteLeadPayload(
     bedrooms,
     move_date: input.data.moveDate || undefined,
     date_flexibility: dateFlexibility,
+    notes,
   });
 
   const attribution = input.attribution

@@ -24,6 +24,7 @@ export type EnquiryFormValues = {
   moveDate: string;
   collectionAddress: string;
   deliveryAddress: string;
+  notes: string;
   companyWebsite: string;
   /** Contact consent — unticked by default */
   consentAccepted: boolean;
@@ -41,6 +42,7 @@ const INITIAL: EnquiryFormValues = {
   moveDate: "",
   collectionAddress: "",
   deliveryAddress: "",
+  notes: "",
   companyWebsite: "",
   consentAccepted: false,
 };
@@ -451,6 +453,23 @@ export function EnquiryQuoteForm({ variant = "modal", onSuccess }: Props) {
             <p className="mt-1 text-xs text-red-600">
               {errors.deliveryAddress}
             </p>
+          ) : null}
+        </div>
+
+        <div className="md:col-span-2">
+          <Label htmlFor={`${formId}-notes`}>Notes (optional)</Label>
+          <textarea
+            id={`${formId}-notes`}
+            name="notes"
+            rows={4}
+            maxLength={2000}
+            className={fieldClass(Boolean(errors.notes))}
+            value={values.notes}
+            onChange={(e) => update({ notes: e.target.value })}
+            placeholder="Access details, parking, special items, or anything else we should know"
+          />
+          {errors.notes ? (
+            <p className="mt-1 text-xs text-red-600">{errors.notes}</p>
           ) : null}
         </div>
       </div>

@@ -27,6 +27,7 @@ const baseData = (): EnquiryPayload => ({
   moveDate: "",
   collectionAddress: "",
   deliveryAddress: "",
+  notes: "",
   pageUrl: "https://www.swlremovals.co.uk/quote",
   consentAccepted: true,
 });
@@ -125,6 +126,33 @@ describe("buildMoveFlowWebsiteLeadPayload", () => {
       consentAccepted: false,
     });
     assert.equal(payload, null);
+  });
+
+  it("forwards form notes as move.notes and omits empty notes", () => {
+    const withNotes = buildMoveFlowWebsiteLeadPayload({
+      data: {
+        ...baseData(),
+        notes: "  Tight parking; piano on first floor.  ",
+      },
+      phoneAsTyped: "07700900123",
+      collectionPostcodeAsTyped: "SW19 1AA",
+      deliveryPostcodeAsTyped: "KT1 2AB",
+      consentAccepted: true,
+      submissionId: "44444444-4444-4444-8444-444444444444",
+    });
+    const move = withNotes!.move as Record<string, unknown>;
+    assert.equal(move.notes, "Tight parking; piano on first floor.");
+
+    const withoutNotes = buildMoveFlowWebsiteLeadPayload({
+      data: baseData(),
+      phoneAsTyped: "07700900123",
+      collectionPostcodeAsTyped: "SW19 1AA",
+      deliveryPostcodeAsTyped: "KT1 2AB",
+      consentAccepted: true,
+      submissionId: "55555555-5555-4555-8555-555555555555",
+    });
+    const emptyMove = withoutNotes!.move as Record<string, unknown>;
+    assert.equal("notes" in emptyMove, false);
   });
 });
 

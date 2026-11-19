@@ -38,6 +38,8 @@ export type EnquiryPayload = {
   moveDate: string;
   collectionAddress: string;
   deliveryAddress: string;
+  /** Optional free-text notes for the move (MoveFlow move.notes, ≤2000). */
+  notes: string;
   pageUrl: string;
   /** Consent checkbox accepted at submit time */
   consentAccepted: boolean;
@@ -104,6 +106,7 @@ export function validateEnquiryPayload(
   const moveDate = clean(raw.moveDate);
   const collectionAddress = clean(raw.collectionAddress);
   const deliveryAddress = clean(raw.deliveryAddress);
+  const notes = clean(raw.notes);
   const pageUrl = clean(raw.pageUrl);
   const consentAccepted =
     raw.consentAccepted === true ||
@@ -160,6 +163,9 @@ export function validateEnquiryPayload(
   if (deliveryAddress.length > 300) {
     errors.deliveryAddress = "Address is too long.";
   }
+  if (notes.length > 2000) {
+    errors.notes = "Notes are too long.";
+  }
 
   if (Object.keys(errors).length > 0) {
     return { ok: false, errors };
@@ -181,6 +187,7 @@ export function validateEnquiryPayload(
       moveDate,
       collectionAddress,
       deliveryAddress,
+      notes: notes.slice(0, 2000),
       pageUrl: pageUrl.slice(0, 500),
       consentAccepted,
       companyWebsite,
@@ -226,6 +233,7 @@ export function buildEnquiryEmailContent(
     ["Exact moving date", displayOrNotProvided(data.moveDate)],
     ["Collection street address", displayOrNotProvided(data.collectionAddress)],
     ["Delivery street address", displayOrNotProvided(data.deliveryAddress)],
+    ["Notes", displayOrNotProvided(data.notes)],
     ["Submitted at (UTC)", submittedAtIso],
     ["Originating page", displayOrNotProvided(data.pageUrl)],
   ];

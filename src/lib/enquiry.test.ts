@@ -74,6 +74,7 @@ describe("buildEnquiryEmailContent", () => {
         moveDate: "",
         collectionAddress: "",
         deliveryAddress: "",
+        notes: "",
         pageUrl: "https://www.swlremovals.co.uk/",
         consentAccepted: false,
       },
@@ -84,6 +85,31 @@ describe("buildEnquiryEmailContent", () => {
     assert.match(text, /Submission reference: SWL-TEST-REF-001/);
     assert.match(text, /Phone: Not provided/);
     assert.match(text, /Exact moving date: Not provided/);
+    assert.match(text, /Notes: Not provided/);
+  });
+
+  it("includes notes text when provided", () => {
+    const result = validateEnquiryPayload({
+      fullName: "Jane Smith",
+      phone: "07700900123",
+      email: "jane@example.com",
+      propertyType: "House",
+      collectionPostcode: "SW19 1AA",
+      deliveryPostcode: "KT1 2AB",
+      bedrooms: "3",
+      timeframe: "This month",
+      notes: "  Piano on first floor  ",
+      pageUrl: "https://www.swlremovals.co.uk/quote",
+    });
+    assert.equal(result.ok, true);
+    if (!result.ok) return;
+    assert.equal(result.data.notes, "Piano on first floor");
+    const { text } = buildEnquiryEmailContent(
+      result.data,
+      "2026-10-19T12:00:00.000Z",
+      "SWL-TEST-REF-002"
+    );
+    assert.match(text, /Notes: Piano on first floor/);
   });
 });
 
