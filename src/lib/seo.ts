@@ -24,6 +24,9 @@ export function resolveDocumentTitle(title: string): string {
   return `${title} | ${SITE_NAME}`;
 }
 
+/** Bump when regenerating favicon/icon assets so browsers pick up the new files. */
+export const SITE_ICON_VERSION = "20261120";
+
 export function createMetadata({
   title,
   description,
@@ -37,6 +40,7 @@ export function createMetadata({
   const url = absoluteUrl(path);
   const imageUrl = ogImage.startsWith("http") ? ogImage : absoluteUrl(ogImage);
   const imageAlt = ogImageAlt ?? `${title} | ${SITE_NAME}`;
+  const iconV = SITE_ICON_VERSION;
 
   return {
     title: fullTitle,
@@ -44,6 +48,19 @@ export function createMetadata({
     keywords: keywords.length > 0 ? keywords : undefined,
     metadataBase: new URL(SITE_URL),
     alternates: { canonical: url },
+    icons: {
+      icon: [
+        { url: `/favicon.ico?v=${iconV}`, sizes: "any" },
+        { url: `/icon.png?v=${iconV}`, type: "image/png", sizes: "48x48" },
+      ],
+      apple: [{ url: `/apple-icon.png?v=${iconV}`, sizes: "180x180" }],
+      other: [
+        {
+          rel: "apple-touch-icon",
+          url: `/apple-touch-icon.png?v=${iconV}`,
+        },
+      ],
+    },
     formatDetection: {
       telephone: false,
       email: false,
